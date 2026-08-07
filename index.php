@@ -97,603 +97,1745 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_log') {
     
     <style>
         :root {
-            --bg-dark: #080c14;
-            --card-bg: rgba(15, 23, 42, 0.75);
-            --card-border: rgba(255, 255, 255, 0.08);
-            --accent-cyan: #00f2fe;
-            --accent-pink: #ff0050;
-            --accent-purple: #8b5cf6;
-            --accent-green: #10b981;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
+            --bg: #08080c;
+            --surface: #111116;
+            --surface-raised: #17171e;
+            --surface-soft: rgba(255, 255, 255, 0.035);
+            --border: rgba(255, 255, 255, 0.09);
+            --border-strong: rgba(255, 255, 255, 0.15);
+            --cyan: #25f4ee;
+            --cyan-rgb: 37, 244, 238;
+            --pink: #fe2c55;
+            --pink-rgb: 254, 44, 85;
+            --green: #38d996;
+            --amber: #fbbf5a;
+            --danger: #ff5d72;
+            --text: #f7f7f8;
+            --muted: #92929f;
+            --muted-light: #bebec8;
+            --radius-xl: 24px;
+            --radius-lg: 18px;
+            --radius-md: 13px;
+            --shadow: 0 30px 80px rgba(0, 0, 0, 0.38);
         }
 
-        body { 
-            background-color: var(--bg-dark);
-            background-image: 
-                radial-gradient(circle at 10% 20%, rgba(0, 242, 254, 0.08) 0%, transparent 40%),
-                radial-gradient(circle at 90% 80%, rgba(255, 0, 80, 0.08) 0%, transparent 40%),
-                radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.05) 0%, transparent 60%);
-            font-family: 'Plus Jakarta Sans', sans-serif; 
-            color: var(--text-main);
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            color-scheme: dark;
+        }
+
+        body {
+            position: relative;
             min-height: 100vh;
+            margin: 0;
             overflow-x: hidden;
+            background:
+                radial-gradient(circle at 12% -8%, rgba(var(--cyan-rgb), 0.14), transparent 30rem),
+                radial-gradient(circle at 92% 8%, rgba(var(--pink-rgb), 0.13), transparent 28rem),
+                linear-gradient(180deg, #0b0b10 0%, var(--bg) 44%, #07070a 100%);
+            color: var(--text);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            -webkit-font-smoothing: antialiased;
         }
 
-        /* Glassmorphism Card */
-        .glass-card { 
-            background: var(--card-bg);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid var(--card-border); 
-            border-radius: 20px; 
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        body::before {
+            position: fixed;
+            z-index: -1;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+            background-size: 48px 48px;
+            mask-image: linear-gradient(to bottom, black, transparent 76%);
+            content: '';
+            pointer-events: none;
         }
 
-        .glass-card:hover {
-            border-color: rgba(255, 255, 255, 0.15);
+        button,
+        input {
+            font: inherit;
         }
 
-        /* Header Neon Logo */
-        .brand-logo {
-            background: linear-gradient(135deg, #00f2fe 0%, #4facfe 40%, #ff0050 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+        button:focus-visible,
+        input:focus-visible {
+            outline: 2px solid var(--cyan);
+            outline-offset: 3px;
+        }
+
+        .text-muted {
+            color: var(--muted) !important;
+        }
+
+        .app-shell {
+            width: min(1440px, calc(100% - 48px));
+            margin: 0 auto;
+            padding: 28px 0 38px;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            min-width: 0;
+            gap: 14px;
+        }
+
+        .brand-mark {
+            position: relative;
+            display: grid;
+            flex: 0 0 auto;
+            width: 48px;
+            height: 48px;
+            place-items: center;
+            border: 1px solid var(--border-strong);
+            border-radius: 15px;
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.025));
+            box-shadow: inset 0 1px rgba(255, 255, 255, 0.1), 0 12px 32px rgba(0, 0, 0, 0.32);
+            font-size: 22px;
+        }
+
+        .brand-mark::before,
+        .brand-mark::after {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            content: '';
+            filter: blur(12px);
+            opacity: 0.55;
+        }
+
+        .brand-mark::before {
+            top: 5px;
+            right: 4px;
+            background: var(--pink);
+        }
+
+        .brand-mark::after {
+            bottom: 5px;
+            left: 4px;
+            background: var(--cyan);
+        }
+
+        .brand-mark i {
+            position: relative;
+            z-index: 1;
+        }
+
+        .brand-copy {
+            min-width: 0;
+        }
+
+        .brand-title-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 9px;
+        }
+
+        .brand-title {
+            margin: 0;
+            color: #fff;
+            font-size: 17px;
             font-weight: 800;
-            letter-spacing: -0.5px;
-            text-shadow: 0 0 30px rgba(0, 242, 254, 0.3);
+            letter-spacing: -0.025em;
+        }
+
+        .brand-subtitle {
+            margin: 3px 0 0;
+            color: var(--muted);
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .version-chip {
+            padding: 4px 8px;
+            border: 1px solid rgba(var(--pink-rgb), 0.3);
+            border-radius: 999px;
+            background: rgba(var(--pink-rgb), 0.08);
+            color: #ff8aa1;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .status-badge {
-            background: rgba(16, 185, 129, 0.1);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-            color: #34d399;
-            font-size: 12px;
-            font-weight: 600;
-            padding: 6px 14px;
-            border-radius: 30px;
             display: inline-flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
+            min-height: 44px;
+            padding: 7px 13px;
+            border: 1px solid rgba(56, 217, 150, 0.22);
+            border-radius: 13px;
+            background: rgba(56, 217, 150, 0.06);
+        }
+
+        .status-caption {
+            display: block;
+            margin-bottom: 1px;
+            color: var(--muted);
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            line-height: 1;
+            text-transform: uppercase;
+        }
+
+        #statusText {
+            display: block;
+            color: #a7f3d0;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1.25;
+        }
+
+        .status-badge[data-state="running"] {
+            border-color: rgba(var(--cyan-rgb), 0.26);
+            background: rgba(var(--cyan-rgb), 0.07);
+        }
+
+        .status-badge[data-state="running"] #statusText {
+            color: var(--cyan);
+        }
+
+        .status-badge[data-state="stopped"] {
+            border-color: rgba(var(--pink-rgb), 0.28);
+            background: rgba(var(--pink-rgb), 0.07);
+        }
+
+        .status-badge[data-state="stopped"] #statusText {
+            color: #ff8aa1;
         }
 
         .pulse-dot {
+            position: relative;
+            flex: 0 0 auto;
             width: 8px;
             height: 8px;
-            background-color: #10b981;
             border-radius: 50%;
-            box-shadow: 0 0 10px #10b981;
-            animation: pulse-ring 1.8s infinite;
+            background: var(--green);
+            box-shadow: 0 0 0 5px rgba(56, 217, 150, 0.09), 0 0 14px rgba(56, 217, 150, 0.7);
+        }
+
+        .pulse-dot::after {
+            position: absolute;
+            inset: -4px;
+            border: 1px solid currentColor;
+            border-radius: inherit;
+            content: '';
+            animation: pulse-ring 1.8s ease-out infinite;
         }
 
         .pulse-dot.running {
-            background-color: var(--accent-cyan);
-            box-shadow: 0 0 10px var(--accent-cyan);
-            animation: pulse-ring 1s infinite;
+            color: var(--cyan);
+            background: var(--cyan);
+            box-shadow: 0 0 0 5px rgba(var(--cyan-rgb), 0.08), 0 0 14px rgba(var(--cyan-rgb), 0.7);
         }
 
         .pulse-dot.stopped {
-            background-color: #ef4444;
-            box-shadow: 0 0 10px #ef4444;
+            color: var(--pink);
+            background: var(--pink);
+            box-shadow: 0 0 0 5px rgba(var(--pink-rgb), 0.08), 0 0 14px rgba(var(--pink-rgb), 0.6);
+        }
+
+        .pulse-dot.stopped::after {
             animation: none;
         }
 
         @keyframes pulse-ring {
-            0% { transform: scale(0.95); opacity: 1; }
-            50% { transform: scale(1.3); opacity: 0.5; }
-            100% { transform: scale(0.95); opacity: 1; }
+            0% { opacity: 0.7; transform: scale(0.6); }
+            80%, 100% { opacity: 0; transform: scale(1.45); }
         }
 
-        /* Metric Mini Cards */
-        .stat-card {
-            background: rgba(15, 23, 42, 0.5);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 14px;
-            padding: 16px 20px;
-            transition: transform 0.2s ease;
+        .icon-button {
+            display: inline-grid;
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            place-items: center;
+            border: 1px solid var(--border);
+            border-radius: 13px;
+            background: rgba(255, 255, 255, 0.035);
+            color: var(--muted-light);
+            transition: 180ms ease;
         }
-        .stat-card:hover {
-            transform: translateY(-2px);
-            background: rgba(30, 41, 59, 0.6);
-        }
-        .stat-label {
-            font-size: 12px;
-            color: var(--text-muted);
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .stat-value {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 20px;
-            font-weight: 700;
+
+        .icon-button:hover {
+            border-color: var(--border-strong);
+            background: rgba(255, 255, 255, 0.075);
             color: #fff;
-            margin-top: 4px;
+            transform: translateY(-1px);
         }
 
-        /* Input Controls */
-        .form-label {
-            font-size: 13px;
-            font-weight: 600;
-            color: #cbd5e1;
-            margin-bottom: 8px;
-        }
-
-        .input-group-text {
-            background: rgba(15, 23, 42, 0.8);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-right: none;
-            color: var(--accent-cyan);
-            border-top-left-radius: 12px;
-            border-bottom-left-radius: 12px;
-        }
-
-        .form-control {
-            background-color: rgba(15, 23, 42, 0.7);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: #f8fafc;
-            border-radius: 12px;
-            padding: 12px 16px;
-            font-size: 14px;
-            transition: all 0.25s ease;
-        }
-
-        .form-control.has-addon {
-            border-top-left-radius: 0;
-            border-bottom-left-radius: 0;
-        }
-
-        .form-control:focus {
-            background-color: rgba(15, 23, 42, 0.9);
-            border-color: var(--accent-cyan);
-            box-shadow: 0 0 15px rgba(0, 242, 254, 0.25);
-            color: #fff;
-        }
-
-        /* Preset Pills */
-        .preset-btn {
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            color: #94a3b8;
-            font-size: 12px;
-            font-weight: 600;
-            padding: 5px 12px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .preset-btn:hover {
-            background: rgba(0, 242, 254, 0.15);
-            border-color: var(--accent-cyan);
-            color: #fff;
-        }
-        .preset-btn.active {
-            background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(139, 92, 246, 0.2));
-            border-color: var(--accent-cyan);
-            color: var(--accent-cyan);
-        }
-
-        /* Range Slider */
-        .form-range::-webkit-slider-thumb {
-            background: var(--accent-cyan);
-            box-shadow: 0 0 10px var(--accent-cyan);
-            cursor: pointer;
-        }
-
-        /* Action Buttons */
-        .btn-launch {
-            background: linear-gradient(135deg, #00f2fe 0%, #4facfe 50%, #8b5cf6 100%);
-            background-size: 200% auto;
-            border: none;
-            color: #000;
-            font-weight: 700;
-            font-size: 15px;
-            border-radius: 14px;
-            padding: 14px 20px;
-            letter-spacing: 0.3px;
-            transition: all 0.4s ease;
-            box-shadow: 0 8px 25px rgba(0, 242, 254, 0.3);
-        }
-
-        .btn-launch:hover:not(:disabled) {
-            background-position: right center;
-            color: #fff;
-            transform: translateY(-2px);
-            box-shadow: 0 12px 35px rgba(139, 92, 246, 0.5);
-        }
-
-        .btn-stop {
-            background: linear-gradient(135deg, #ef4444 0%, #991b1b 100%);
-            border: none;
-            color: #fff;
-            font-weight: 700;
-            font-size: 15px;
-            border-radius: 14px;
-            padding: 14px 20px;
-            transition: all 0.3s ease;
-            box-shadow: 0 8px 20px rgba(239, 68, 68, 0.25);
-        }
-
-        .btn-stop:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 30px rgba(239, 68, 68, 0.45);
-        }
-
-        .btn:disabled {
-            opacity: 0.45;
+        .icon-button:disabled {
             cursor: not-allowed;
-            transform: none !important;
+            opacity: 0.4;
+            transform: none;
         }
 
-        /* Terminal Window */
-        .terminal-wrapper {
-            border-radius: 16px;
-            overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
-            background-color: #030712;
+        .intro {
             display: flex;
-            flex-direction: column;
-            height: 100%;
-            min-height: 480px;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 32px;
+            padding: 40px 0 25px;
         }
 
-        .terminal-header {
-            background-color: #0f172a;
-            padding: 12px 18px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            color: var(--cyan);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .eyebrow::before {
+            width: 20px;
+            height: 1px;
+            background: var(--cyan);
+            content: '';
+            box-shadow: 0 0 8px rgba(var(--cyan-rgb), 0.7);
+        }
+
+        .intro h1 {
+            max-width: 720px;
+            margin: 0;
+            color: #fff;
+            font-size: clamp(28px, 4vw, 48px);
+            font-weight: 800;
+            letter-spacing: -0.05em;
+            line-height: 1.05;
+        }
+
+        .intro h1 span {
+            background: linear-gradient(90deg, var(--cyan), #9dfbf8 45%, #ff8aa1 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .intro-description {
+            max-width: 680px;
+            margin: 13px 0 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        .intro-tags {
+            display: flex;
+            flex: 0 0 auto;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 8px;
+            padding-bottom: 5px;
+        }
+
+        .intro-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 8px 11px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.025);
+            color: var(--muted-light);
+            font-size: 10px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .intro-tag i {
+            color: var(--cyan);
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .stat-card {
+            position: relative;
+            display: flex;
+            align-items: center;
+            min-width: 0;
+            gap: 13px;
+            padding: 16px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.018));
+            box-shadow: inset 0 1px rgba(255, 255, 255, 0.045);
+            transition: border-color 180ms ease, transform 180ms ease, background 180ms ease;
+        }
+
+        .stat-card:hover {
+            border-color: var(--border-strong);
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.072), rgba(255, 255, 255, 0.024));
+            transform: translateY(-2px);
+        }
+
+        .stat-icon {
+            display: grid;
+            flex: 0 0 auto;
+            width: 42px;
+            height: 42px;
+            place-items: center;
+            border: 1px solid rgba(var(--cyan-rgb), 0.16);
+            border-radius: 12px;
+            background: rgba(var(--cyan-rgb), 0.075);
+            color: var(--cyan);
+        }
+
+        .stat-icon.pink {
+            border-color: rgba(var(--pink-rgb), 0.17);
+            background: rgba(var(--pink-rgb), 0.075);
+            color: #ff7892;
+        }
+
+        .stat-icon.green {
+            border-color: rgba(56, 217, 150, 0.17);
+            background: rgba(56, 217, 150, 0.075);
+            color: var(--green);
+        }
+
+        .stat-icon.amber {
+            border-color: rgba(251, 191, 90, 0.17);
+            background: rgba(251, 191, 90, 0.075);
+            color: var(--amber);
+        }
+
+        .stat-content {
+            min-width: 0;
+        }
+
+        .stat-label {
+            overflow: hidden;
+            color: var(--muted);
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-overflow: ellipsis;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .stat-value {
+            overflow: hidden;
+            margin-top: 4px;
+            color: #fff !important;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: -0.04em;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .workspace-grid {
+            display: grid;
+            grid-template-columns: minmax(360px, 0.82fr) minmax(500px, 1.18fr);
+            align-items: stretch;
+            gap: 18px;
+        }
+
+        .workspace-grid > *,
+        .config-card,
+        .terminal-wrapper {
+            width: 100%;
+            min-width: 0;
+        }
+
+        .glass-card {
+            overflow: hidden;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            background: linear-gradient(155deg, rgba(24, 24, 31, 0.96), rgba(14, 14, 19, 0.96));
+            box-shadow: var(--shadow), inset 0 1px rgba(255, 255, 255, 0.05);
+        }
+
+        .config-card {
+            height: 100%;
+        }
+
+        .panel-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 16px;
+            padding: 20px 22px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.015);
+        }
+
+        .panel-heading {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+        }
+
+        .panel-heading-icon {
+            display: grid;
+            width: 34px;
+            height: 34px;
+            place-items: center;
+            border: 1px solid rgba(var(--cyan-rgb), 0.15);
+            border-radius: 10px;
+            background: rgba(var(--cyan-rgb), 0.07);
+            color: var(--cyan);
+            font-size: 13px;
+        }
+
+        .panel-title {
+            margin: 0;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .panel-subtitle {
+            margin: 3px 0 0;
+            color: var(--muted);
+            font-size: 10px;
+        }
+
+        .engine-chip {
+            flex: 0 0 auto;
+            padding: 6px 9px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--muted-light);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            font-weight: 600;
+        }
+
+        .config-body {
+            padding: 21px 22px 22px;
+        }
+
+        .step-block {
+            position: relative;
+            padding-left: 37px;
+        }
+
+        .step-block + .step-block {
+            margin-top: 21px;
+            padding-top: 1px;
+        }
+
+        .step-block:not(:last-of-type)::after {
+            position: absolute;
+            top: 29px;
+            bottom: -18px;
+            left: 13px;
+            width: 1px;
+            background: linear-gradient(to bottom, var(--border-strong), transparent);
+            content: '';
+        }
+
+        .step-index {
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: grid;
+            width: 27px;
+            height: 27px;
+            place-items: center;
+            border: 1px solid var(--border-strong);
+            border-radius: 9px;
+            background: var(--surface-raised);
+            color: var(--cyan);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            font-weight: 700;
+            box-shadow: 0 5px 16px rgba(0, 0, 0, 0.28);
+        }
+
+        .field-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            min-height: 27px;
+            margin-bottom: 9px;
+        }
+
+        .form-label {
+            margin: 0;
+            color: #dedee4;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .field-meta {
+            color: var(--muted);
+            font-size: 9px;
+            font-weight: 600;
+        }
+
+        .input-group {
+            flex-wrap: nowrap;
+        }
+
+        .input-group-text,
+        .form-control,
+        .paste-button {
+            min-height: 45px;
+            border-color: var(--border);
+            background: rgba(5, 5, 8, 0.46);
+        }
+
+        .input-group-text {
+            min-width: 43px;
+            justify-content: center;
+            border-right: 0;
+            border-radius: var(--radius-md) 0 0 var(--radius-md);
+            color: var(--cyan);
+            font-size: 12px;
+        }
+
+        .form-control {
+            min-width: 0;
+            padding: 11px 13px;
+            border-radius: var(--radius-md);
+            color: var(--text);
+            font-size: 12px;
+            box-shadow: none;
+            transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+        }
+
+        .form-control.has-addon {
+            border-left: 0;
+            border-radius: 0 var(--radius-md) var(--radius-md) 0;
+        }
+
+        .input-group:focus-within .input-group-text,
+        .input-group:focus-within .paste-button,
+        .form-control:focus {
+            border-color: rgba(var(--cyan-rgb), 0.48);
+        }
+
+        .input-group:focus-within {
+            border-radius: var(--radius-md);
+            box-shadow: 0 0 0 3px rgba(var(--cyan-rgb), 0.075);
+        }
+
+        .form-control:focus {
+            background: rgba(7, 7, 11, 0.72);
+            color: #fff;
+            box-shadow: none;
+        }
+
+        .form-control::placeholder {
+            color: #5f5f6b;
+        }
+
+        .paste-button {
+            min-width: 43px;
+            padding: 0 13px;
+            border: 1px solid var(--border);
+            border-left: 0;
+            border-radius: 0 var(--radius-md) var(--radius-md) 0;
+            color: var(--muted-light);
+            transition: 180ms ease;
+        }
+
+        .paste-button:hover {
+            background: rgba(var(--cyan-rgb), 0.07);
+            color: var(--cyan);
+        }
+
+        .input-group .form-control.has-end-action {
+            border-radius: 0;
+        }
+
+        .form-text {
+            margin-top: 7px;
+            color: var(--muted) !important;
+            font-size: 10px;
+            line-height: 1.55;
+        }
+
+        .preset-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .preset-btn {
+            padding: 6px 9px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.025);
+            color: var(--muted-light);
+            font-size: 9px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 160ms ease;
+        }
+
+        .preset-btn:hover {
+            border-color: rgba(var(--cyan-rgb), 0.34);
+            background: rgba(var(--cyan-rgb), 0.06);
+            color: #fff;
+            transform: translateY(-1px);
+        }
+
+        .preset-btn.active {
+            border-color: rgba(var(--cyan-rgb), 0.46);
+            background: rgba(var(--cyan-rgb), 0.1);
+            color: var(--cyan);
+            box-shadow: inset 0 0 0 1px rgba(var(--cyan-rgb), 0.05);
+        }
+
+        .preset-btn.extreme.active,
+        .preset-btn.extreme:hover {
+            border-color: rgba(var(--pink-rgb), 0.44);
+            background: rgba(var(--pink-rgb), 0.09);
+            color: #ff8aa1;
+        }
+
+        .thread-value {
+            padding: 4px 7px;
+            border: 1px solid rgba(var(--cyan-rgb), 0.18);
+            border-radius: 7px;
+            background: rgba(var(--cyan-rgb), 0.06);
+            color: var(--cyan);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            font-weight: 700;
+        }
+
+        .range-wrap {
+            position: relative;
+            margin: 10px 0 0;
+        }
+
+        .form-range {
+            height: 16px;
+            margin: 0;
+        }
+
+        .form-range::-webkit-slider-runnable-track {
+            height: 4px;
+            border-radius: 999px;
+            background: linear-gradient(90deg, var(--cyan), rgba(var(--cyan-rgb), 0.11));
+        }
+
+        .form-range::-webkit-slider-thumb {
+            width: 15px;
+            height: 15px;
+            margin-top: -5.5px;
+            border: 3px solid #111116;
+            background: var(--cyan);
+            box-shadow: 0 0 0 2px rgba(var(--cyan-rgb), 0.25), 0 0 16px rgba(var(--cyan-rgb), 0.4);
+            cursor: pointer;
+        }
+
+        .form-range::-moz-range-track {
+            height: 4px;
+            border-radius: 999px;
+            background: rgba(var(--cyan-rgb), 0.12);
+        }
+
+        .form-range::-moz-range-progress {
+            height: 4px;
+            border-radius: 999px;
+            background: var(--cyan);
+        }
+
+        .form-range::-moz-range-thumb {
+            width: 11px;
+            height: 11px;
+            border: 3px solid #111116;
+            border-radius: 50%;
+            background: var(--cyan);
+            box-shadow: 0 0 0 2px rgba(var(--cyan-rgb), 0.25);
+            cursor: pointer;
+        }
+
+        .thread-warning {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            margin-top: 8px;
+            color: var(--amber);
+            font-size: 10px;
+            line-height: 1.5;
+        }
+
+        .text-success.thread-warning { color: var(--green) !important; }
+        .text-warning.thread-warning { color: var(--amber) !important; }
+        .text-danger.thread-warning { color: var(--danger) !important; }
+
+        .action-area {
+            margin-top: 23px;
+            padding-top: 18px;
+            border-top: 1px solid var(--border);
+        }
+
+        .action-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 104px;
+            gap: 9px;
+        }
+
+        .btn-launch,
+        .btn-stop {
+            min-height: 48px;
+            border-radius: 13px;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: -0.01em;
+            transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+        }
+
+        .btn-launch {
+            position: relative;
+            overflow: hidden;
+            border: 0;
+            background: linear-gradient(100deg, var(--cyan) 0%, #7af9f5 52%, var(--pink) 160%);
+            color: #071111;
+            box-shadow: 0 12px 30px rgba(var(--cyan-rgb), 0.16);
+        }
+
+        .btn-launch::after {
+            position: absolute;
+            top: -100%;
+            left: -30%;
+            width: 24%;
+            height: 300%;
+            background: rgba(255, 255, 255, 0.48);
+            content: '';
+            transform: rotate(22deg);
+            transition: left 450ms ease;
+        }
+
+        .btn-launch:hover:not(:disabled) {
+            color: #071111;
+            filter: brightness(1.05);
+            transform: translateY(-2px);
+            box-shadow: 0 15px 36px rgba(var(--cyan-rgb), 0.23);
+        }
+
+        .btn-launch:hover:not(:disabled)::after {
+            left: 120%;
+        }
+
+        .btn-stop {
+            border: 1px solid rgba(var(--pink-rgb), 0.28);
+            background: rgba(var(--pink-rgb), 0.09);
+            color: #ff8aa1;
+        }
+
+        .btn-stop:hover:not(:disabled) {
+            border-color: rgba(var(--pink-rgb), 0.48);
+            background: rgba(var(--pink-rgb), 0.16);
+            color: #fff;
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            cursor: not-allowed;
+            filter: grayscale(0.35);
+            opacity: 0.42;
+            transform: none !important;
+        }
+
+        .action-note {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin: 10px 0 0;
+            color: #686875;
+            font-size: 8px;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            text-align: center;
+        }
+
+        .action-note i {
+            color: var(--green);
+        }
+
+        .terminal-wrapper {
+            display: flex;
+            height: 100%;
+            min-height: 706px;
+            overflow: hidden;
+            flex-direction: column;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            background: #08090d;
+            box-shadow: var(--shadow), inset 0 1px rgba(255, 255, 255, 0.045);
+        }
+
+        .terminal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 64px;
+            gap: 14px;
+            padding: 13px 18px;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(180deg, #17171d, #121217);
+        }
+
+        .terminal-identity {
+            display: flex;
+            align-items: center;
+            min-width: 0;
+            gap: 12px;
         }
 
         .mac-dots {
             display: flex;
-            gap: 8px;
+            flex: 0 0 auto;
+            gap: 6px;
         }
+
         .mac-dot {
-            width: 12px;
-            height: 12px;
+            width: 9px;
+            height: 9px;
             border-radius: 50%;
+            box-shadow: inset 0 -1px 1px rgba(0, 0, 0, 0.24);
         }
-        .mac-dot.close { background-color: #ff5f56; }
-        .mac-dot.min { background-color: #ffbd2e; }
-        .mac-dot.max { background-color: #27c93f; }
+
+        .mac-dot.close { background: #ff5f57; }
+        .mac-dot.min { background: #febc2e; }
+        .mac-dot.max { background: #28c840; }
 
         .terminal-title {
+            overflow: hidden;
+            color: #c4c4cc;
             font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
-            color: #64748b;
-            font-weight: 500;
+            font-size: 10px;
+            font-weight: 600;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
-        .terminal-actions button {
+        .terminal-title i {
+            margin-right: 6px;
+            color: var(--cyan);
+        }
+
+        .live-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 7px;
+            border: 1px solid rgba(56, 217, 150, 0.16);
+            border-radius: 999px;
+            background: rgba(56, 217, 150, 0.05);
+            color: #85e8bd;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 8px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+        }
+
+        .live-chip::before {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: var(--green);
+            content: '';
+            box-shadow: 0 0 8px rgba(56, 217, 150, 0.75);
+        }
+
+        .terminal-actions {
+            display: flex;
+            align-items: center;
+            flex: 0 0 auto;
+            gap: 4px;
+        }
+
+        .auto-scroll-control {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-right: 4px;
+        }
+
+        .auto-scroll-control label {
+            color: var(--muted);
+            font-size: 9px;
+            font-weight: 600;
+        }
+
+        .form-check-input {
+            width: 27px !important;
+            height: 15px;
+            margin: 0 !important;
+            border-color: var(--border-strong);
+            background-color: rgba(255, 255, 255, 0.08);
+            cursor: pointer;
+        }
+
+        .form-check-input:checked {
+            border-color: rgba(var(--cyan-rgb), 0.52);
+            background-color: var(--cyan);
+        }
+
+        .terminal-action {
+            display: grid;
+            width: 31px;
+            height: 31px;
+            padding: 0;
+            place-items: center;
+            border: 1px solid transparent;
+            border-radius: 9px;
             background: transparent;
-            border: none;
-            color: #94a3b8;
-            font-size: 13px;
-            padding: 4px 8px;
-            border-radius: 6px;
-            transition: all 0.2s;
-        }
-        .terminal-actions button:hover {
-            color: var(--accent-cyan);
-            background: rgba(255, 255, 255, 0.05);
+            color: var(--muted);
+            font-size: 11px;
+            transition: 160ms ease;
         }
 
-        /* Progress Overlay */
+        .terminal-action:hover {
+            border-color: var(--border);
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--cyan);
+        }
+
         .progress-bar-container {
-            background: rgba(15, 23, 42, 0.9);
-            padding: 14px 20px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 15px 19px 16px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.018);
+        }
+
+        .progress-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            margin-bottom: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+        }
+
+        .progress-label {
+            color: var(--muted);
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        #progressPercentText {
+            margin-left: 5px;
+            color: #fff;
+        }
+
+        #progressDetailText {
+            color: var(--cyan);
         }
 
         .custom-progress {
-            height: 10px;
-            background-color: rgba(255, 255, 255, 0.08);
-            border-radius: 20px;
+            height: 6px;
             overflow: hidden;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.065);
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
         }
 
         .custom-progress-inner {
+            position: relative;
+            width: 0;
             height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, #00f2fe 0%, #8b5cf6 50%, #ff0050 100%);
-            border-radius: 20px;
-            transition: width 0.4s ease;
-            box-shadow: 0 0 12px rgba(0, 242, 254, 0.6);
+            overflow: hidden;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--cyan), #7cf8f4 65%, var(--pink));
+            box-shadow: 0 0 15px rgba(var(--cyan-rgb), 0.32);
+            transition: width 350ms ease;
+        }
+
+        .custom-progress-inner::after {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+            content: '';
+            animation: progress-shimmer 1.8s linear infinite;
+            transform: translateX(-100%);
+        }
+
+        @keyframes progress-shimmer {
+            to { transform: translateX(100%); }
         }
 
         .terminal-body {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            line-height: 1.6;
-            padding: 20px;
-            flex-grow: 1;
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 22px;
             overflow-y: auto;
-            color: #38bdf8;
+            background:
+                linear-gradient(rgba(var(--cyan-rgb), 0.012) 1px, transparent 1px),
+                #090a0f;
+            background-size: 100% 27px;
+            color: #7dd9d5;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            line-height: 1.72;
+            tab-size: 4;
             white-space: pre-wrap;
-            word-break: break-all;
+            word-break: break-word;
         }
 
-        .log-info { color: #38bdf8; }
-        .log-success { color: #34d399; font-weight: 600; }
-        .log-warn { color: #fbbf24; }
-        .log-danger { color: #f87171; font-weight: 600; }
-        .log-highlight { color: #e879f9; }
+        .terminal-body::selection,
+        .terminal-body *::selection {
+            background: rgba(var(--cyan-rgb), 0.22);
+            color: #fff;
+        }
 
-        /* Scrollbar Styling */
+        .log-info { color: #79c8e8; }
+        .log-success { color: #65dfa8; font-weight: 600; }
+        .log-warn { color: var(--amber); }
+        .log-danger { color: #ff7184; font-weight: 600; }
+        .log-highlight { color: #f192c8; }
+
+        .terminal-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 9px 18px;
+            border-top: 1px solid var(--border);
+            background: #0f1015;
+            color: #646470;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 8px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+        }
+
+        .terminal-footer span {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .terminal-footer i {
+            color: var(--green);
+        }
+
+        .page-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 18px 4px 0;
+            color: #585864;
+            font-size: 9px;
+            font-weight: 600;
+        }
+
+        .page-footer span {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
         ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
+            width: 7px;
+            height: 7px;
         }
+
         ::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.2);
+            background: rgba(255, 255, 255, 0.012);
         }
+
         ::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 4px;
+            border: 2px solid transparent;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.16);
+            background-clip: padding-box;
         }
+
         ::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.28);
+            background-clip: padding-box;
+        }
+
+        @media (max-width: 1100px) {
+            .intro {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 18px;
+            }
+
+            .intro-tags {
+                justify-content: flex-start;
+            }
+
+            .workspace-grid {
+                grid-template-columns: minmax(330px, 0.9fr) minmax(440px, 1.1fr);
+            }
+        }
+
+        @media (max-width: 900px) {
+            .metrics-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .workspace-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .terminal-wrapper {
+                min-height: 560px;
+            }
+        }
+
+        @media (max-width: 575px) {
+            .app-shell {
+                width: calc(100% - 24px);
+                max-width: 100%;
+                padding-top: 16px;
+            }
+
+            .topbar {
+                align-items: center;
+                gap: 10px;
+                padding-bottom: 17px;
+            }
+
+            .brand {
+                flex: 1 1 auto;
+                min-width: 0;
+            }
+
+            .brand-copy {
+                overflow: hidden;
+            }
+
+            .brand-title-row {
+                flex-wrap: nowrap;
+            }
+
+            .brand-mark {
+                width: 43px;
+                height: 43px;
+                border-radius: 13px;
+            }
+
+            .brand-title {
+                overflow: hidden;
+                font-size: 14px;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .brand-subtitle,
+            .version-chip,
+            .status-caption,
+            .intro-tags,
+            .auto-scroll-control label,
+            .live-chip,
+            .engine-chip,
+            .field-meta {
+                display: none;
+            }
+
+            .status-badge {
+                display: grid;
+                width: 40px;
+                min-height: 40px;
+                padding: 0;
+                place-items: center;
+            }
+
+            .status-badge > span:last-child {
+                display: none;
+            }
+
+            .header-actions {
+                gap: 7px;
+            }
+
+            .icon-button {
+                width: 40px;
+                height: 40px;
+            }
+
+            .intro {
+                padding: 29px 1px 22px;
+            }
+
+            .intro h1 {
+                max-width: 100%;
+                font-size: 29px;
+                overflow-wrap: anywhere;
+            }
+
+            .intro h1 span {
+                display: block;
+            }
+
+            .intro-description {
+                font-size: 11px;
+            }
+
+            .metrics-grid {
+                width: 100%;
+                gap: 8px;
+            }
+
+            .stat-card {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 9px;
+                padding: 13px;
+            }
+
+            .stat-icon {
+                width: 34px;
+                height: 34px;
+                border-radius: 10px;
+                font-size: 12px;
+            }
+
+            .stat-value {
+                font-size: 13px;
+            }
+
+            .panel-header,
+            .config-body {
+                padding-right: 16px;
+                padding-left: 16px;
+            }
+
+            .step-block {
+                padding-left: 35px;
+            }
+
+            .action-grid {
+                grid-template-columns: minmax(0, 1fr) 88px;
+            }
+
+            .terminal-header {
+                min-height: 58px;
+                padding-right: 12px;
+                padding-left: 14px;
+            }
+
+            .terminal-identity {
+                flex: 1 1 auto;
+            }
+
+            .terminal-title {
+                max-width: 118px;
+            }
+
+            .terminal-actions {
+                gap: 1px;
+            }
+
+            .terminal-action {
+                width: 36px;
+                height: 36px;
+            }
+
+            .terminal-wrapper {
+                min-height: 480px;
+            }
+
+            .terminal-body {
+                padding: 17px;
+                font-size: 10px;
+            }
+
+            .page-footer {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 6px;
+            }
+        }
+
+        @media (max-width: 360px) {
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .action-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .btn-stop {
+                min-height: 44px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                scroll-behavior: auto !important;
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
         }
     </style>
 </head>
 <body>
-
-<div class="container py-4 py-md-5">
-
-    <!-- Header Bar -->
-    <div class="d-flex flex-column flex-md-row align-items-center justify-content-between mb-4 pb-3 border-bottom border-secondary border-opacity-25">
-        <div class="d-flex align-items-center gap-3 mb-3 mb-md-0">
-            <div class="p-3 glass-card d-flex align-items-center justify-content-center" style="width: 54px; height: 54px; border-radius: 16px;">
-                <i class="fa-brands fa-tiktok text-info fs-3"></i>
+<main class="app-shell">
+    <header class="topbar">
+        <div class="brand">
+            <div class="brand-mark" aria-hidden="true">
+                <i class="fa-brands fa-tiktok"></i>
             </div>
-            <div>
-                <div class="d-flex align-items-center gap-2">
-                    <h2 class="brand-logo mb-0">TikTok Views Booster</h2>
-                    <span class="badge bg-purple text-wrap" style="background: linear-gradient(135deg, #8b5cf6, #ec4899); font-size: 10px;">ULTRA v3.5</span>
+            <div class="brand-copy">
+                <div class="brand-title-row">
+                    <p class="brand-title">TikTok Views Booster</p>
+                    <span class="version-chip">ULTRA v3.5</span>
                 </div>
-                <p class="text-muted small mb-0">High-Performance Asynchronous Multi-Threading Views Injector</p>
+                <p class="brand-subtitle">Multi-thread control center</p>
             </div>
         </div>
 
-        <div class="d-flex align-items-center gap-3">
-            <div class="status-badge" id="systemStatusBadge">
-                <span class="pulse-dot" id="statusDot"></span>
-                <span id="statusText">System Ready</span>
+        <div class="header-actions">
+            <div class="status-badge" id="systemStatusBadge" data-state="ready" role="status" aria-live="polite">
+                <span class="pulse-dot" id="statusDot" aria-hidden="true"></span>
+                <span>
+                    <small class="status-caption">Engine status</small>
+                    <strong id="statusText">System Ready</strong>
+                </span>
             </div>
-            <button class="btn btn-outline-light btn-sm rounded-circle p-2" style="width: 38px; height: 38px;" title="Reset Form" onclick="resetForm()">
-                <i class="fa-solid fa-rotate-right"></i>
+            <button type="button" class="icon-button" id="resetBtn" title="Reset formulir" aria-label="Reset formulir" onclick="resetForm()">
+                <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
             </button>
         </div>
-    </div>
+    </header>
 
-    <!-- Quick Stats Grid -->
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-lg-3">
-            <div class="stat-card">
-                <div class="stat-label"><i class="fa-solid fa-server me-1 text-info"></i> Engine Status</div>
+    <section class="intro" aria-labelledby="pageTitle">
+        <div>
+            <span class="eyebrow">Live automation workspace</span>
+            <h1 id="pageTitle">Dorong performa. <span>Pantau secara real-time.</span></h1>
+            <p class="intro-description">Atur target, sesuaikan kapasitas goroutine, dan monitor setiap proses dari satu dashboard yang ringkas.</p>
+        </div>
+        <div class="intro-tags" aria-label="Fitur engine">
+            <span class="intro-tag"><i class="fa-solid fa-wave-square" aria-hidden="true"></i> Live monitor</span>
+            <span class="intro-tag"><i class="fa-solid fa-layer-group" aria-hidden="true"></i> Multi-thread</span>
+            <span class="intro-tag"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Proxy ready</span>
+        </div>
+    </section>
+
+    <section class="metrics-grid" aria-label="Ringkasan proses">
+        <article class="stat-card">
+            <span class="stat-icon"><i class="fa-solid fa-server" aria-hidden="true"></i></span>
+            <div class="stat-content">
+                <div class="stat-label">Status Engine</div>
                 <div class="stat-value text-info" id="cardStatus">IDLE</div>
             </div>
-        </div>
-        <div class="col-6 col-lg-3">
-            <div class="stat-card">
-                <div class="stat-label"><i class="fa-solid fa-microchip me-1 text-purple"></i> Max Threads</div>
-                <div class="stat-value text-warning" id="cardThreads">5,000 Max</div>
+        </article>
+        <article class="stat-card">
+            <span class="stat-icon amber"><i class="fa-solid fa-microchip" aria-hidden="true"></i></span>
+            <div class="stat-content">
+                <div class="stat-label">Goroutine</div>
+                <div class="stat-value text-warning" id="cardThreads">500 Ready</div>
             </div>
-        </div>
-        <div class="col-6 col-lg-3">
-            <div class="stat-card">
-                <div class="stat-label"><i class="fa-solid fa-bullseye me-1 text-success"></i> Views Target</div>
+        </article>
+        <article class="stat-card">
+            <span class="stat-icon green"><i class="fa-solid fa-bullseye" aria-hidden="true"></i></span>
+            <div class="stat-content">
+                <div class="stat-label">Target Views</div>
                 <div class="stat-value text-success" id="cardTarget">0</div>
             </div>
-        </div>
-        <div class="col-6 col-lg-3">
-            <div class="stat-card">
-                <div class="stat-label"><i class="fa-solid fa-bolt me-1 text-danger"></i> Injection Speed</div>
+        </article>
+        <article class="stat-card">
+            <span class="stat-icon pink"><i class="fa-solid fa-bolt" aria-hidden="true"></i></span>
+            <div class="stat-content">
+                <div class="stat-label">Kecepatan</div>
                 <div class="stat-value text-danger" id="cardSpeed">0 /sec</div>
             </div>
-        </div>
-    </div>
+        </article>
+    </section>
 
-    <div class="row g-4">
-        <!-- Configuration Form (Left Column) -->
-        <div class="col-lg-5">
-            <div class="glass-card p-4 p-md-4">
-                <div class="d-flex align-items-center justify-content-between mb-4">
-                    <h5 class="fw-bold mb-0 text-white">
-                        <i class="fa-solid fa-sliders text-info me-2"></i>Configuration Panel
-                    </h5>
-                    <span class="badge bg-secondary bg-opacity-25 text-light font-monospace" style="font-size: 11px;">Go Engine v1.21</span>
+    <section class="workspace-grid" aria-label="Workspace booster">
+        <article class="glass-card config-card">
+            <header class="panel-header">
+                <div class="panel-heading">
+                    <span class="panel-heading-icon"><i class="fa-solid fa-sliders" aria-hidden="true"></i></span>
+                    <div>
+                        <h2 class="panel-title">Konfigurasi Booster</h2>
+                        <p class="panel-subtitle">Siapkan parameter sebelum engine dijalankan</p>
+                    </div>
                 </div>
-                
-                <form id="boosterForm">
-                    <!-- Target Link Input -->
-                    <div class="mb-3">
-                        <label for="target" class="form-label">TikTok Video Link / Video ID</label>
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="fa-solid fa-link"></i></span>
-                            <input type="text" class="form-control has-addon" id="target" name="target" placeholder="https://www.tiktok.com/@username/video/73... / ID" required>
-                            <button type="button" class="btn btn-outline-secondary text-light px-3" onclick="pasteClipboard()" title="Paste Link">
-                                <i class="fa-regular fa-clipboard"></i>
-                            </button>
-                        </div>
-                        <div class="form-text text-muted" style="font-size: 11px;">Mendukung format URL TikTok standar, mobile, maupun Video ID angka.</div>
-                    </div>
+                <span class="engine-chip">GO v1.21</span>
+            </header>
 
-                    <!-- Quantity Input & Presets -->
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label for="quantity" class="form-label mb-0">Jumlah Views</label>
-                            <span class="text-muted" style="font-size: 11px;">Preset Cepat:</span>
-                        </div>
-                        <div class="input-group mb-2">
-                            <span class="input-group-text"><i class="fa-solid fa-eye"></i></span>
-                            <input type="number" class="form-control has-addon" id="quantity" name="quantity" min="1" placeholder="Contoh: 10000" required>
-                        </div>
-                        <div class="d-flex flex-wrap gap-1">
-                            <button type="button" class="preset-btn" onclick="setQuantity(1000)">+1,000</button>
-                            <button type="button" class="preset-btn" onclick="setQuantity(5000)">+5,000</button>
-                            <button type="button" class="preset-btn active" onclick="setQuantity(10000)">+10,000</button>
-                            <button type="button" class="preset-btn" onclick="setQuantity(50000)">+50,000</button>
-                            <button type="button" class="preset-btn" onclick="setQuantity(100000)">+100,000</button>
-                        </div>
+            <form id="boosterForm" class="config-body">
+                <section class="step-block">
+                    <span class="step-index" aria-hidden="true">01</span>
+                    <div class="field-heading">
+                        <label for="target" class="form-label">Link video atau Video ID</label>
+                        <span class="field-meta">Wajib diisi</span>
                     </div>
-
-                    <!-- Threads Range & Number Input (UP TO 5000 THREADS) -->
-                    <div class="mb-4">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label for="threads" class="form-label mb-0">Goroutine Threads (Kecepatan)</label>
-                            <span class="badge bg-info bg-opacity-10 text-info font-monospace fw-bold" id="threadValueDisplay">500 Threads</span>
-                        </div>
-                        <div class="input-group mb-2">
-                            <span class="input-group-text"><i class="fa-solid fa-gauge-high"></i></span>
-                            <input type="number" class="form-control has-addon font-monospace fw-bold" id="threads" name="threads" value="500" min="1" max="5000" oninput="syncThreadsFromInput(this.value)">
-                        </div>
-                        <!-- Range Slider -->
-                        <input type="range" class="form-range" id="threadRange" min="10" max="5000" step="10" value="500" oninput="syncThreadsFromSlider(this.value)">
-                        
-                        <div class="d-flex flex-wrap gap-1 mt-2">
-                            <button type="button" class="preset-btn" onclick="setThreads(300)">300 Standard</button>
-                            <button type="button" class="preset-btn" onclick="setThreads(1000)">1,000 High</button>
-                            <button type="button" class="preset-btn" onclick="setThreads(3000)">3,000 Turbo</button>
-                            <button type="button" class="preset-btn active" style="border-color: var(--accent-pink); color: var(--accent-pink);" onclick="setThreads(5000)">5,000 EXTREME ⚡</button>
-                        </div>
-                        <div class="form-text text-warning mt-2" style="font-size: 11px;" id="threadWarning">
-                            <i class="fa-solid fa-triangle-exclamation me-1"></i>Max threads 5,000 diaktifkan. Gunakan koneksi/VPS dengan spek tinggi untuk hasil optimal.
-                        </div>
-                    </div>
-
-                    <!-- Proxy Input (Optional) -->
-                    <div class="mb-4">
-                        <label for="proxy" class="form-label">Proxy HTTP / HTTPS (Opsional)</label>
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="fa-solid fa-shield-halved"></i></span>
-                            <input type="text" class="form-control has-addon" id="proxy" name="proxy" placeholder="ip:port ATAU ip:port:user:password">
-                        </div>
-                        <div class="form-text text-muted" style="font-size: 11px;">Kosongkan jika ingin menggunakan Outbound Direct Network VPS.</div>
-                    </div>
-
-                    <!-- Buttons -->
-                    <div class="row g-2 pt-2">
-                        <div class="col-8">
-                            <button type="submit" id="submitBtn" class="btn btn-launch w-100">
-                                <i class="fa-solid fa-bolt me-2"></i>Mulai Suntik (5000 Max)
-                            </button>
-                        </div>
-                        <div class="col-4">
-                            <button type="button" id="stopBtn" class="btn btn-stop w-100" disabled>
-                                <i class="fa-solid fa-square me-1"></i>Stop
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Terminal & Real-Time Log Monitor (Right Column) -->
-        <div class="col-lg-7">
-            <div class="terminal-wrapper">
-                <!-- Mac-Style Window Bar -->
-                <div class="terminal-header">
-                    <div class="d-flex align-items-center gap-2">
-                        <div class="mac-dots">
-                            <span class="mac-dot close"></span>
-                            <span class="mac-dot min"></span>
-                            <span class="mac-dot max"></span>
-                        </div>
-                        <span class="terminal-title ms-2">
-                            <i class="fa-solid fa-terminal text-info me-1"></i>live_output.log
-                        </span>
-                    </div>
-
-                    <div class="terminal-actions d-flex align-items-center gap-2">
-                        <div class="form-check form-switch mb-0 me-2" style="font-size: 11px;">
-                            <input class="form-check-input" type="checkbox" id="autoScrollCheck" checked>
-                            <label class="form-check-label text-muted" for="autoScrollCheck">Auto-scroll</label>
-                        </div>
-                        <button type="button" onclick="copyTerminalLogs()" title="Copy Logs">
-                            <i class="fa-regular fa-copy"></i>
-                        </button>
-                        <button type="button" onclick="clearTerminalLogs()" title="Clear Screen">
-                            <i class="fa-solid fa-trash-can"></i>
+                    <div class="input-group">
+                        <span class="input-group-text" aria-hidden="true"><i class="fa-solid fa-link"></i></span>
+                        <input type="text" class="form-control has-addon has-end-action" id="target" name="target" placeholder="Tempel URL TikTok atau Video ID" aria-describedby="targetHelp" autocomplete="off" required>
+                        <button type="button" class="paste-button" onclick="pasteClipboard()" title="Tempel dari clipboard" aria-label="Tempel link dari clipboard">
+                            <i class="fa-regular fa-clipboard" aria-hidden="true"></i>
                         </button>
                     </div>
+                    <div class="form-text" id="targetHelp">Mendukung URL TikTok standar, versi mobile, dan Video ID angka.</div>
+                </section>
+
+                <section class="step-block">
+                    <span class="step-index" aria-hidden="true">02</span>
+                    <div class="field-heading">
+                        <label for="quantity" class="form-label">Jumlah views</label>
+                        <span class="field-meta">Pilih preset atau isi manual</span>
+                    </div>
+                    <div class="input-group">
+                        <span class="input-group-text" aria-hidden="true"><i class="fa-solid fa-eye"></i></span>
+                        <input type="number" class="form-control has-addon" id="quantity" name="quantity" min="1" inputmode="numeric" placeholder="Contoh: 10.000" required>
+                    </div>
+                    <div class="preset-list" aria-label="Preset jumlah views">
+                        <button type="button" class="preset-btn quantity-preset" data-quantity="1000" aria-pressed="false" onclick="setQuantity(1000)">1K</button>
+                        <button type="button" class="preset-btn quantity-preset" data-quantity="5000" aria-pressed="false" onclick="setQuantity(5000)">5K</button>
+                        <button type="button" class="preset-btn quantity-preset" data-quantity="10000" aria-pressed="false" onclick="setQuantity(10000)">10K</button>
+                        <button type="button" class="preset-btn quantity-preset" data-quantity="50000" aria-pressed="false" onclick="setQuantity(50000)">50K</button>
+                        <button type="button" class="preset-btn quantity-preset" data-quantity="100000" aria-pressed="false" onclick="setQuantity(100000)">100K</button>
+                    </div>
+                </section>
+
+                <section class="step-block">
+                    <span class="step-index" aria-hidden="true">03</span>
+                    <div class="field-heading">
+                        <label for="threads" class="form-label">Goroutine threads</label>
+                        <output class="thread-value" id="threadValueDisplay" for="threads threadRange">500 Threads</output>
+                    </div>
+                    <div class="input-group">
+                        <span class="input-group-text" aria-hidden="true"><i class="fa-solid fa-gauge-high"></i></span>
+                        <input type="number" class="form-control has-addon font-monospace fw-bold" id="threads" name="threads" value="500" min="1" max="5000" inputmode="numeric" aria-describedby="threadWarning" oninput="syncThreadsFromInput(this.value)">
+                    </div>
+                    <div class="range-wrap">
+                        <input type="range" class="form-range" id="threadRange" min="10" max="5000" step="10" value="500" aria-label="Pilih jumlah goroutine threads" oninput="syncThreadsFromSlider(this.value)">
+                    </div>
+                    <div class="preset-list" aria-label="Preset jumlah threads">
+                        <button type="button" class="preset-btn thread-preset" data-threads="300" aria-pressed="false" onclick="setThreads(300)">300 Standard</button>
+                        <button type="button" class="preset-btn thread-preset active" data-threads="500" aria-pressed="true" onclick="setThreads(500)">500 Balanced</button>
+                        <button type="button" class="preset-btn thread-preset" data-threads="1000" aria-pressed="false" onclick="setThreads(1000)">1K High</button>
+                        <button type="button" class="preset-btn thread-preset" data-threads="3000" aria-pressed="false" onclick="setThreads(3000)">3K Turbo</button>
+                        <button type="button" class="preset-btn thread-preset extreme" data-threads="5000" aria-pressed="false" onclick="setThreads(5000)">5K Extreme</button>
+                    </div>
+                    <div class="thread-warning text-success" id="threadWarning">
+                        <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                        <span>Standard Stable Mode (500 Threads).</span>
+                    </div>
+                </section>
+
+                <section class="step-block">
+                    <span class="step-index" aria-hidden="true">04</span>
+                    <div class="field-heading">
+                        <label for="proxy" class="form-label">Proxy HTTP / HTTPS</label>
+                        <span class="field-meta">Opsional</span>
+                    </div>
+                    <div class="input-group">
+                        <span class="input-group-text" aria-hidden="true"><i class="fa-solid fa-shield-halved"></i></span>
+                        <input type="text" class="form-control has-addon" id="proxy" name="proxy" placeholder="ip:port atau ip:port:user:password" aria-describedby="proxyHelp" autocomplete="off">
+                    </div>
+                    <div class="form-text" id="proxyHelp">Kosongkan untuk menggunakan jaringan outbound langsung dari VPS.</div>
+                </section>
+
+                <div class="action-area">
+                    <div class="action-grid">
+                        <button type="submit" id="submitBtn" class="btn btn-launch">
+                            <i class="fa-solid fa-bolt me-2" aria-hidden="true"></i>Mulai Booster
+                        </button>
+                        <button type="button" id="stopBtn" class="btn btn-stop" disabled>
+                            <i class="fa-solid fa-square me-1" aria-hidden="true"></i>Stop
+                        </button>
+                    </div>
+                    <p class="action-note"><i class="fa-solid fa-lock" aria-hidden="true"></i> Parameter dikirim langsung ke engine lokal</p>
+                </div>
+            </form>
+        </article>
+
+        <article class="terminal-wrapper" aria-labelledby="terminalTitle">
+            <header class="terminal-header">
+                <div class="terminal-identity">
+                    <div class="mac-dots" aria-hidden="true">
+                        <span class="mac-dot close"></span>
+                        <span class="mac-dot min"></span>
+                        <span class="mac-dot max"></span>
+                    </div>
+                    <span class="terminal-title" id="terminalTitle">
+                        <i class="fa-solid fa-terminal" aria-hidden="true"></i>engine / live_output.log
+                    </span>
+                    <span class="live-chip">LIVE</span>
                 </div>
 
-                <!-- Progress Header -->
-                <div class="progress-bar-container" id="progressContainer">
-                    <div class="d-flex justify-content-between align-items-center mb-2" style="font-size: 12px;">
-                        <span class="text-muted font-monospace">
-                            PROGRESS: <strong class="text-white" id="progressPercentText">0%</strong>
-                        </span>
-                        <span class="font-monospace text-info" id="progressDetailText">0 / 0 Views</span>
+                <div class="terminal-actions">
+                    <div class="auto-scroll-control form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="autoScrollCheck" checked>
+                        <label for="autoScrollCheck">Auto-scroll</label>
                     </div>
-                    <div class="custom-progress">
-                        <div class="custom-progress-inner" id="progressBarInner"></div>
-                    </div>
+                    <button type="button" class="terminal-action" onclick="copyTerminalLogs()" title="Salin log" aria-label="Salin isi log">
+                        <i class="fa-regular fa-copy" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" class="terminal-action" onclick="clearTerminalLogs()" title="Bersihkan layar" aria-label="Bersihkan layar terminal">
+                        <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                    </button>
                 </div>
+            </header>
 
-                <!-- Terminal Body -->
-                <div class="terminal-body" id="terminalLog">[*] Menunggu instruksi dari Configuration Panel...</div>
+            <div class="progress-bar-container" id="progressContainer" role="progressbar" aria-label="Progres views" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <div class="progress-meta">
+                    <span class="progress-label">Progress <strong id="progressPercentText">0%</strong></span>
+                    <span id="progressDetailText">0 / 0 Views</span>
+                </div>
+                <div class="custom-progress" aria-hidden="true">
+                    <div class="custom-progress-inner" id="progressBarInner"></div>
+                </div>
             </div>
-        </div>
-    </div>
-</div>
+
+            <div class="terminal-body" id="terminalLog" role="log" aria-label="Log proses booster" tabindex="0">[*] Engine siap. Lengkapi konfigurasi untuk memulai proses...</div>
+
+            <footer class="terminal-footer">
+                <span><i class="fa-solid fa-circle" aria-hidden="true"></i> POLLING 400MS</span>
+                <span>UTF-8 · GO ENGINE</span>
+            </footer>
+        </article>
+    </section>
+
+    <footer class="page-footer">
+        <span><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Local engine control panel</span>
+        <span>Multi-thread workspace · v3.5</span>
+    </footer>
+</main>
 
 <script>
     let pollInterval = null;
     let targetViewsGoal = 0;
+    let engineRunning = false;
+    let logRequestInFlight = false;
 
-    // Sync Slider & Input Num
-    function syncThreadsFromSlider(val) {
-        document.getElementById('threads').value = val;
-        updateThreadDisplay(val);
+    function showToast(icon, title) {
+        if (typeof Swal === 'undefined') return;
+
+        const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 2400,
+            timerProgressBar: true,
+            background: '#17171e',
+            color: '#f7f7f8'
+        });
+
+        Toast.fire({ icon, title });
     }
+
+    function escapeHtml(value) {
+        const entities = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+
+        return String(value).replace(/[&<>"']/g, character => entities[character]);
+    }
+
+    function setActivePreset(selector, dataKey, value) {
+        document.querySelectorAll(selector).forEach(button => {
+            const isActive = Number(button.dataset[dataKey]) === Number(value);
+            button.classList.toggle('active', isActive);
+            button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+    }
+
+    function normalizeThreads(value) {
+        const parsed = parseInt(value, 10);
+        return Math.min(5000, Math.max(1, Number.isFinite(parsed) ? parsed : 1));
+    }
+
+    function syncThreadsFromSlider(val) {
+        const threads = normalizeThreads(val);
+        document.getElementById('threads').value = threads;
+        updateThreadDisplay(threads);
+        setActivePreset('.thread-preset', 'threads', threads);
+    }
+
     function syncThreadsFromInput(val) {
-        let v = parseInt(val) || 1;
-        if (v > 10000) v = 10000;
-        document.getElementById('threadRange').value = Math.min(v, 5000);
-        updateThreadDisplay(v);
+        const threads = normalizeThreads(val);
+        const input = document.getElementById('threads');
+
+        if (parseInt(val, 10) > 5000 || parseInt(val, 10) < 1) {
+            input.value = threads;
+        }
+
+        document.getElementById('threadRange').value = Math.max(10, threads);
+        updateThreadDisplay(threads);
+        setActivePreset('.thread-preset', 'threads', threads);
     }
 
     function updateThreadDisplay(val) {
+        const threads = normalizeThreads(val);
         const display = document.getElementById('threadValueDisplay');
         const cardThreads = document.getElementById('cardThreads');
-        display.innerText = parseInt(val).toLocaleString() + ' Threads';
-        cardThreads.innerText = parseInt(val).toLocaleString() + ' Active';
-        
+        const formattedThreads = threads.toLocaleString('id-ID');
+
+        display.innerText = `${formattedThreads} Threads`;
+        cardThreads.innerText = `${formattedThreads} ${engineRunning ? 'Active' : 'Ready'}`;
+
         const warning = document.getElementById('threadWarning');
-        if (val > 3000) {
-            warning.innerHTML = `<i class="fa-solid fa-bolt me-1 text-danger"></i><strong>TURBO EXTREME (${parseInt(val).toLocaleString()} Threads)</strong>: Membutuhkan CPU & bandwidth tinggi.`;
-            warning.className = "form-text text-danger mt-2";
-        } else if (val > 1000) {
-            warning.innerHTML = `<i class="fa-solid fa-gauge-high me-1 text-warning"></i>High Performance Mode (${parseInt(val).toLocaleString()} Threads).`;
-            warning.className = "form-text text-warning mt-2";
+        if (threads > 3000) {
+            warning.innerHTML = `<i class="fa-solid fa-bolt" aria-hidden="true"></i><span><strong>Turbo Extreme (${formattedThreads} Threads).</strong> Membutuhkan CPU dan bandwidth tinggi.</span>`;
+            warning.className = 'thread-warning text-danger';
+        } else if (threads > 1000) {
+            warning.innerHTML = `<i class="fa-solid fa-gauge-high" aria-hidden="true"></i><span>High Performance Mode (${formattedThreads} Threads).</span>`;
+            warning.className = 'thread-warning text-warning';
         } else {
-            warning.innerHTML = `<i class="fa-solid fa-circle-check me-1 text-success"></i>Standard Stable Mode (${parseInt(val).toLocaleString()} Threads).`;
-            warning.className = "form-text text-success mt-2";
+            warning.innerHTML = `<i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>Standard Stable Mode (${formattedThreads} Threads).</span>`;
+            warning.className = 'thread-warning text-success';
         }
     }
 
     function setQuantity(val) {
         document.getElementById('quantity').value = val;
-        document.getElementById('cardTarget').innerText = val.toLocaleString();
-        
-        // Highlight active button
-        document.querySelectorAll('.preset-btn').forEach(btn => {
-            if (btn.innerText.includes(val.toLocaleString())) {
-                btn.classList.add('active');
-            }
-        });
+        document.getElementById('cardTarget').innerText = val.toLocaleString('id-ID');
+        setActivePreset('.quantity-preset', 'quantity', val);
     }
 
     function setThreads(val) {
-        document.getElementById('threads').value = val;
-        document.getElementById('threadRange').value = Math.min(val, 5000);
-        updateThreadDisplay(val);
+        const threads = normalizeThreads(val);
+        document.getElementById('threads').value = threads;
+        document.getElementById('threadRange').value = Math.max(10, threads);
+        updateThreadDisplay(threads);
+        setActivePreset('.thread-preset', 'threads', threads);
     }
 
     async function pasteClipboard() {
@@ -701,58 +1843,87 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_log') {
             const text = await navigator.clipboard.readText();
             if (text) {
                 document.getElementById('target').value = text;
-                const Toast = Swal.mixin({
-                    toast: true,
-                    position: 'top-end',
-                    showConfirmButton: false,
-                    timer: 2000,
-                    background: '#0f172a',
-                    color: '#fff'
-                });
-                Toast.fire({ icon: 'success', title: 'Link berhasil ditempel!' });
+                showToast('success', 'Link berhasil ditempel');
             }
         } catch (err) {
             console.error('Clipboard access denied:', err);
+            showToast('warning', 'Izin clipboard tidak tersedia');
+        }
+    }
+
+    function setProgress(percent, current = null, total = null) {
+        const safePercent = Math.min(100, Math.max(0, Number(percent) || 0));
+        const progressContainer = document.getElementById('progressContainer');
+
+        document.getElementById('progressBarInner').style.width = `${safePercent}%`;
+        document.getElementById('progressPercentText').innerText = `${Math.round(safePercent)}%`;
+        progressContainer.setAttribute('aria-valuenow', String(Math.round(safePercent)));
+
+        if (current !== null && total !== null) {
+            const detail = `${Number(current).toLocaleString('id-ID')} / ${Number(total).toLocaleString('id-ID')} Views`;
+            document.getElementById('progressDetailText').innerText = detail;
+            progressContainer.setAttribute('aria-valuetext', `${Math.round(safePercent)} persen, ${detail}`);
         }
     }
 
     function resetForm() {
+        if (engineRunning) {
+            showToast('warning', 'Hentikan proses sebelum mereset formulir');
+            return;
+        }
+
         document.getElementById('boosterForm').reset();
         document.getElementById('threads').value = 500;
         document.getElementById('threadRange').value = 500;
+        targetViewsGoal = 0;
+        setActivePreset('.quantity-preset', 'quantity', -1);
+        setActivePreset('.thread-preset', 'threads', 500);
         updateThreadDisplay(500);
         document.getElementById('cardTarget').innerText = '0';
-        document.getElementById('cardStatus').innerText = 'IDLE';
-        document.getElementById('cardStatus').className = 'stat-value text-info';
         document.getElementById('cardSpeed').innerText = '0 /sec';
-        document.getElementById('progressBarInner').style.width = '0%';
-        document.getElementById('progressPercentText').innerText = '0%';
-        document.getElementById('progressDetailText').innerText = '0 / 0 Views';
+        setProgress(0, 0, 0);
+        setEngineStatus('SIAP', 'ready');
+        showToast('info', 'Formulir berhasil direset');
     }
+
+    document.getElementById('quantity').addEventListener('input', function() {
+        const quantity = Math.max(0, parseInt(this.value, 10) || 0);
+        document.getElementById('cardTarget').innerText = quantity.toLocaleString('id-ID');
+        setActivePreset('.quantity-preset', 'quantity', quantity);
+    });
 
     document.getElementById('boosterForm').addEventListener('submit', function(e) {
         e.preventDefault();
-        
+
         const target = document.getElementById('target').value.trim();
-        const quantity = parseInt(document.getElementById('quantity').value) || 0;
-        const threads = parseInt(document.getElementById('threads').value) || 300;
+        const quantity = parseInt(document.getElementById('quantity').value, 10) || 0;
+        const threads = normalizeThreads(document.getElementById('threads').value);
         const proxy = document.getElementById('proxy').value.trim();
-        
+
+        if (!target || quantity <= 0) {
+            showToast('warning', 'Lengkapi target dan jumlah views');
+            return;
+        }
+
         targetViewsGoal = quantity;
-        document.getElementById('cardTarget').innerText = quantity.toLocaleString();
+        engineRunning = true;
+        document.getElementById('threads').value = threads;
+        document.getElementById('cardTarget').innerText = quantity.toLocaleString('id-ID');
 
         const btn = document.getElementById('submitBtn');
         const stopBtn = document.getElementById('stopBtn');
         const terminal = document.getElementById('terminalLog');
 
-        // Update UI State to RUNNING
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Injecting...';
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2" aria-hidden="true"></i>Menjalankan...';
         btn.disabled = true;
         stopBtn.disabled = false;
+        document.getElementById('resetBtn').disabled = true;
 
-        setEngineStatus('RUNNING', 'running');
+        setEngineStatus('BERJALAN', 'running');
+        updateThreadDisplay(threads);
+        setProgress(0, 0, quantity);
 
-        terminal.innerHTML = `[+] Inisialisasi Booster Ultra Engine...\n[*] Target: ${target}\n[*] Quantity: ${quantity.toLocaleString()} views\n[*] Threads: ${threads.toLocaleString()} Goroutines\n-------------------------------------------------\n`;
+        terminal.textContent = `[+] Inisialisasi Booster Ultra Engine...\n[*] Target: ${target}\n[*] Quantity: ${quantity.toLocaleString('id-ID')} views\n[*] Threads: ${threads.toLocaleString('id-ID')} goroutines\n-------------------------------------------------\n`;
 
         const formData = new FormData();
         formData.append('target', target);
@@ -768,56 +1939,46 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_log') {
         .then(res => res.json())
         .then(data => {
             if (data.status === 'success') {
-                terminal.innerHTML += `[✓] ${data.message}\n[*] Memulai pemantauan real-time logs...\n\n`;
-                
-                // Toast notification
-                const Toast = Swal.mixin({
-                    toast: true,
-                    position: 'top-end',
-                    showConfirmButton: false,
-                    timer: 3000,
-                    background: '#0f172a',
-                    color: '#fff'
-                });
-                Toast.fire({ icon: 'success', title: 'Booster Berhasil Dijalankan!' });
+                terminal.textContent += `[✓] ${data.message}\n[*] Memulai pemantauan log real-time...\n\n`;
+                showToast('success', 'Booster berhasil dijalankan');
 
                 if (pollInterval) clearInterval(pollInterval);
+                fetchLogs();
                 pollInterval = setInterval(fetchLogs, 400);
             } else {
-                terminal.innerHTML += `[!] Error: ${data.message}\n`;
-                Swal.fire({ icon: 'error', title: 'Gagal Memulai', text: data.message, background: '#0f172a', color: '#fff' });
+                terminal.textContent += `[!] Error: ${data.message}\n`;
+                Swal.fire({ icon: 'error', title: 'Gagal memulai', text: data.message, background: '#17171e', color: '#f7f7f8' });
                 resetUI();
             }
         })
         .catch(err => {
-            terminal.innerHTML += `[!] Error Server: ${err.message}\n`;
+            terminal.textContent += `[!] Error server: ${err.message}\n`;
             resetUI();
         });
     });
 
-    // Event handler Stop
     document.getElementById('stopBtn').addEventListener('click', function() {
         const terminal = document.getElementById('terminalLog');
         const stopBtn = document.getElementById('stopBtn');
 
         stopBtn.disabled = true;
-        stopBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Stopping...';
-        terminal.innerHTML += '\n[!] Mengirim sinyal SIGKILL penghentian paksa ke server...\n';
+        stopBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1" aria-hidden="true"></i>Stop...';
+        terminal.textContent += '\n[!] Mengirim sinyal penghentian ke server...\n';
 
         fetch('index.php?action=stop')
         .then(res => res.json())
         .then(data => {
             if (data.status === 'success') {
-                terminal.innerHTML += `[✓] ${data.message}\n`;
+                terminal.textContent += `[✓] ${data.message}\n`;
             } else {
-                terminal.innerHTML += `[!] Error: ${data.message}\n`;
+                terminal.textContent += `[!] Error: ${data.message}\n`;
             }
             clearInterval(pollInterval);
             fetchLogs(); 
             resetUI('STOPPED');
         })
         .catch(err => {
-            terminal.innerHTML += `[!] Gagal menghentikan: ${err.message}\n`;
+            terminal.textContent += `[!] Gagal menghentikan: ${err.message}\n`;
             clearInterval(pollInterval);
             resetUI('STOPPED');
         });
@@ -831,6 +1992,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_log') {
 
         text.innerText = stateText;
         cardStatus.innerText = stateText;
+        badge.dataset.state = dotClass;
 
         if (dotClass === 'running') {
             dot.className = 'pulse-dot running';
@@ -844,21 +2006,25 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_log') {
         }
     }
 
+    function colorizeLogs(text) {
+        return escapeHtml(text)
+            .replace(/(\[\+\][^\n]*)/g, '<span class="log-success">$1</span>')
+            .replace(/(\[\*\][^\n]*)/g, '<span class="log-info">$1</span>')
+            .replace(/(\[\!\][^\n]*)/g, '<span class="log-danger">$1</span>')
+            .replace(/(\[✓\][^\n]*)/g, '<span class="log-success">$1</span>');
+    }
+
     function fetchLogs() {
+        if (logRequestInFlight) return Promise.resolve();
+
+        logRequestInFlight = true;
         const terminal = document.getElementById('terminalLog');
         const autoScroll = document.getElementById('autoScrollCheck').checked;
 
-        fetch('index.php?action=get_log')
+        return fetch('index.php?action=get_log')
         .then(res => res.text())
         .then(text => {
-            // Colorize log text
-            let formattedText = text
-                .replace(/(\[\+\][^\n]*)/g, '<span class="log-success">$1</span>')
-                .replace(/(\[\*\][^\n]*)/g, '<span class="log-info">$1</span>')
-                .replace(/(\[\!\][^\n]*)/g, '<span class="log-danger">$1</span>')
-                .replace(/(\[✓\][^\n]*)/g, '<span class="log-success">$1</span>');
-
-            terminal.innerHTML = formattedText;
+            terminal.innerHTML = colorizeLogs(text);
             
             if (autoScroll) {
                 terminal.scrollTop = terminal.scrollHeight;
@@ -878,18 +2044,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_log') {
 
                 if (totalGoal > 0) {
                     const percent = Math.min(100, Math.round((currentViews / totalGoal) * 100));
-                    document.getElementById('progressBarInner').style.width = percent + '%';
-                    document.getElementById('progressPercentText').innerText = percent + '%';
-                    document.getElementById('progressDetailText').innerText = `${currentViews.toLocaleString()} / ${totalGoal.toLocaleString()} Views`;
+                    setProgress(percent, currentViews, totalGoal);
                 }
             }
 
-            // Detect finish or stop condition
             if (text.includes('[✓] Selesai!') || text.includes('[!] Gagal') || text.includes('dihentikan secara paksa') || text.includes('tidak valid!')) {
                 clearInterval(pollInterval);
                 if (text.includes('[✓] Selesai!')) {
-                    document.getElementById('progressBarInner').style.width = '100%';
-                    document.getElementById('progressPercentText').innerText = '100%';
+                    setProgress(100, targetViewsGoal, targetViewsGoal);
                     resetUI('FINISHED');
                 } else {
                     resetUI('STOPPED');
@@ -898,6 +2060,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_log') {
         })
         .catch(err => {
             console.error('Log polling error:', err);
+        })
+        .finally(() => {
+            logRequestInFlight = false;
         });
     }
 
@@ -905,42 +2070,42 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_log') {
         const btn = document.getElementById('submitBtn');
         const stopBtn = document.getElementById('stopBtn');
 
-        btn.innerHTML = '<i class="fa-solid fa-bolt me-2"></i>Mulai Suntik (5000 Max)';
+        engineRunning = false;
+        btn.innerHTML = '<i class="fa-solid fa-bolt me-2" aria-hidden="true"></i>Mulai Booster';
         btn.disabled = false;
-        
-        stopBtn.innerHTML = '<i class="fa-solid fa-square me-1"></i>Stop';
+        stopBtn.innerHTML = '<i class="fa-solid fa-square me-1" aria-hidden="true"></i>Stop';
         stopBtn.disabled = true;
+        document.getElementById('resetBtn').disabled = false;
+        updateThreadDisplay(document.getElementById('threads').value);
 
         if (finalState === 'FINISHED') {
-            setEngineStatus('FINISHED ✓', 'ready');
+            setEngineStatus('SELESAI ✓', 'ready');
         } else if (finalState === 'STOPPED') {
-            setEngineStatus('STOPPED', 'stopped');
+            setEngineStatus('DIHENTIKAN', 'stopped');
         } else {
-            setEngineStatus('System Ready', 'ready');
+            setEngineStatus('SIAP', 'ready');
         }
     }
 
     function clearTerminalLogs() {
-        document.getElementById('terminalLog').innerHTML = '[*] Screen cleared.\n';
+        document.getElementById('terminalLog').textContent = '[*] Layar terminal dibersihkan.\n';
     }
 
-    function copyTerminalLogs() {
+    async function copyTerminalLogs() {
         const text = document.getElementById('terminalLog').innerText;
-        navigator.clipboard.writeText(text).then(() => {
-            const Toast = Swal.mixin({
-                toast: true,
-                position: 'top-end',
-                showConfirmButton: false,
-                timer: 2000,
-                background: '#0f172a',
-                color: '#fff'
-            });
-            Toast.fire({ icon: 'info', title: 'Logs berhasil disalin!' });
-        });
+
+        try {
+            await navigator.clipboard.writeText(text);
+            showToast('success', 'Log berhasil disalin');
+        } catch (err) {
+            console.error('Copy log failed:', err);
+            showToast('warning', 'Log tidak dapat disalin');
+        }
     }
 
-    // Initialize display on load
     updateThreadDisplay(500);
+    setActivePreset('.thread-preset', 'threads', 500);
+    setEngineStatus('SIAP', 'ready');
 </script>
 
 </body>

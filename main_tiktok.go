@@ -335,10 +335,14 @@ func sendview(c *http.Client, vid string, st *tiktokStats, useProxy bool) {
 			}
 			return
 		}
+		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 
-		if resp.StatusCode == 200 {
+		contentType := strings.ToLower(resp.Header.Get("Content-Type"))
+		bodyStr := strings.ToLower(string(bodyBytes))
+
+		if resp.StatusCode == 200 && (strings.Contains(contentType, "json") || strings.Contains(bodyStr, "status_code")) && !strings.Contains(bodyStr, "<html") && !strings.Contains(bodyStr, "<!doctype") {
 			atomic.AddInt64(&st.s, 1)
 		} else {
 			atomic.AddInt64(&st.f, 1)

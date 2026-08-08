@@ -12,6 +12,77 @@ $sessions_file = __DIR__ . '/sessions.json';
 $active_session_file = __DIR__ . '/active_session.json';
 $pid_path = __DIR__ . '/pid.txt';
 
+// Kirim error API secara konsisten tanpa menyimpan respons sensitif di cache.
+function json_api_error($status_code, $message, $error_code = null) {
+    http_response_code($status_code);
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+
+    $response = [
+        'status' => 'error',
+        'message' => $message
+    ];
+
+    if ($error_code !== null) {
+        $response['error_code'] = $error_code;
+    }
+
+    echo json_encode($response);
+    exit;
+}
+
+// Ambil Authorization header pada Apache maupun reverse proxy/FastCGI.
+function get_authorization_header() {
+    foreach (['HTTP_AUTHORIZATION', 'REDIRECT_HTTP_AUTHORIZATION'] as $server_key) {
+        if (!empty($_SERVER[$server_key])) {
+            return trim((string) $_SERVER[$server_key]);
+        }
+    }
+
+    if (function_exists('getallheaders')) {
+        $headers = getallheaders();
+        if (is_array($headers)) {
+            foreach ($headers as $header_name => $header_value) {
+                if (strcasecmp($header_name, 'Authorization') === 0) {
+                    return trim((string) $header_value);
+                }
+            }
+        }
+    }
+
+    return '';
+}
+
+// Lindungi aksi administratif menggunakan ADMIN_TOKEN dari environment Railway.
+function require_admin_auth() {
+    $expected_token = getenv('ADMIN_TOKEN');
+
+    if (!is_string($expected_token) || strlen($expected_token) < 32) {
+        error_log('ADMIN_TOKEN belum dikonfigurasi atau panjangnya kurang dari 32 karakter.');
+        json_api_error(503, 'Autentikasi server belum dikonfigurasi.', 'auth_not_configured');
+    }
+
+    $authorization = get_authorization_header();
+    $provided_token = '';
+
+    if (preg_match('/^Bearer[ \t]+([^\s]+)$/i', $authorization, $matches) === 1) {
+        $provided_token = $matches[1];
+    }
+
+    if ($provided_token === '' || !hash_equals($expected_token, $provided_token)) {
+        header('WWW-Authenticate: Bearer realm="booster-admin"');
+        json_api_error(401, 'Token autentikasi tidak valid.', 'unauthorized');
+    }
+}
+
+// Aksi yang mengubah state wajib menggunakan POST.
+function require_post_request() {
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+        header('Allow: POST');
+        json_api_error(405, 'Method tidak diizinkan. Gunakan POST.', 'method_not_allowed');
+    }
+}
+
 // Utility helper untuk membaca JSON input (cURL / Fetch API compatibility)
 function get_request_data() {
     $data = $_REQUEST;
@@ -108,6 +179,12 @@ function get_current_active_session() {
 // ----------------------------------------------------
 
 $action = $_GET['action'] ?? null;
+
+// Aksi mutasi hanya boleh dipanggil melalui POST dengan Bearer token yang valid.
+if (in_array($action, ['run', 'stop', 'clear_history'], true)) {
+    require_post_request();
+    require_admin_auth();
+}
 
 // 1. ACTION: RUN (Mulai booster baru)
 if ($action === 'run') {
@@ -2173,6 +2250,97 @@ if ($action === 'clear_history') {
     let historyModalInstance = null;
     let logViewerModalInstance = null;
 
+    // Token hanya disimpan di memori halaman dan tidak pernah ditanam di source code.
+    const adminApi = (() => {
+        let token = '';
+        let promptPromise = null;
+
+        function cancelledAuthError() {
+            const error = new Error('Autentikasi dibatalkan.');
+            error.name = 'AuthCancelledError';
+            return error;
+        }
+
+        async function getToken(forcePrompt = false) {
+            if (!forcePrompt && token) return token;
+            if (promptPromise) return promptPromise;
+
+            if (typeof Swal === 'undefined') {
+                throw new Error('Dialog autentikasi tidak tersedia. Muat ulang halaman lalu coba lagi.');
+            }
+
+            promptPromise = Swal.fire({
+                title: 'Autentikasi Admin',
+                text: 'Masukkan ADMIN_TOKEN untuk melanjutkan aksi ini.',
+                icon: 'info',
+                input: 'password',
+                inputPlaceholder: 'ADMIN_TOKEN',
+                inputAttributes: {
+                    autocomplete: 'off',
+                    autocapitalize: 'none',
+                    spellcheck: 'false'
+                },
+                showCancelButton: true,
+                confirmButtonText: 'Autentikasi',
+                cancelButtonText: 'Batal',
+                confirmButtonColor: '#25f4ee',
+                cancelButtonColor: '#2b2b36',
+                background: '#17171e',
+                color: '#f7f7f8',
+                inputValidator: value => value && value.trim() ? undefined : 'Token wajib diisi.'
+            }).then(result => {
+                if (!result.isConfirmed) {
+                    throw cancelledAuthError();
+                }
+
+                token = result.value.trim();
+                return token;
+            }).finally(() => {
+                promptPromise = null;
+            });
+
+            return promptPromise;
+        }
+
+        async function request(action, body = {}, retried = false) {
+            const activeToken = await getToken(retried);
+            const isFormData = body instanceof FormData;
+            const headers = new Headers({
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${activeToken}`
+            });
+
+            if (!isFormData) {
+                headers.set('Content-Type', 'application/json');
+            }
+
+            const response = await fetch(`index.php?action=${encodeURIComponent(action)}`, {
+                method: 'POST',
+                headers,
+                body: isFormData ? body : JSON.stringify(body || {})
+            });
+
+            const data = await response.json().catch(() => ({
+                status: 'error',
+                message: `Respons server tidak valid (${response.status}).`
+            }));
+
+            if (response.status === 401 && !retried) {
+                token = '';
+                showToast('error', 'Token salah. Silakan masukkan ulang.');
+                return request(action, body, true);
+            }
+
+            if (!response.ok) {
+                throw new Error(data.message || `Request gagal (${response.status}).`);
+            }
+
+            return data;
+        }
+
+        return { request };
+    })();
+
     document.addEventListener('DOMContentLoaded', function() {
         checkActiveStatusOnLoad();
     });
@@ -2409,12 +2577,8 @@ if ($action === 'clear_history') {
         formData.append('threads', threads);
         formData.append('proxy', proxy);
 
-        // Fetch execution API
-        fetch('index.php?action=run', {
-            method: 'POST',
-            body: formData
-        })
-        .then(res => res.json())
+        // Request terlindungi dengan Bearer token dari dialog admin.
+        adminApi.request('run', formData)
         .then(data => {
             if (data.status === 'success') {
                 if (data.data && data.data.session_id) {
@@ -2433,7 +2597,12 @@ if ($action === 'clear_history') {
             }
         })
         .catch(err => {
+            if (err.name === 'AuthCancelledError') {
+                resetUI();
+                return;
+            }
             terminal.textContent += `[!] Error server: ${err.message}\n`;
+            showToast('error', err.message);
             resetUI();
         });
     });
@@ -2446,22 +2615,31 @@ if ($action === 'clear_history') {
         stopBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1" aria-hidden="true"></i>Stop...';
         terminal.textContent += '\n[!] Mengirim sinyal penghentian ke server...\n';
 
-        fetch('index.php?action=stop')
-        .then(res => res.json())
+        adminApi.request('stop', {})
         .then(data => {
             if (data.status === 'success') {
                 terminal.textContent += `[✓] ${data.message}\n`;
+                clearInterval(pollInterval);
+                fetchLogs();
+                resetUI('STOPPED');
             } else {
                 terminal.textContent += `[!] Error: ${data.message}\n`;
+                stopBtn.disabled = false;
+                stopBtn.innerHTML = '<i class="fa-solid fa-square me-1" aria-hidden="true"></i>Stop';
+                showToast('error', data.message);
             }
-            clearInterval(pollInterval);
-            fetchLogs(); 
-            resetUI('STOPPED');
         })
         .catch(err => {
+            stopBtn.disabled = false;
+            stopBtn.innerHTML = '<i class="fa-solid fa-square me-1" aria-hidden="true"></i>Stop';
+
+            if (err.name === 'AuthCancelledError') {
+                terminal.textContent += '[*] Penghentian dibatalkan; proses tetap berjalan.\n';
+                return;
+            }
+
             terminal.textContent += `[!] Gagal menghentikan: ${err.message}\n`;
-            clearInterval(pollInterval);
-            resetUI('STOPPED');
+            showToast('error', err.message);
         });
     });
 
@@ -2713,14 +2891,18 @@ if ($action === 'clear_history') {
             color: '#f7f7f8'
         }).then((result) => {
             if (result.isConfirmed) {
-                fetch(`index.php?action=clear_history&session_id=${encodeURIComponent(sessionId)}`)
-                .then(res => res.json())
+                adminApi.request('clear_history', { session_id: sessionId })
                 .then(data => {
                     if (data.status === 'success') {
                         showToast('success', data.message);
                         loadHistoryData();
                     } else {
                         showToast('error', data.message);
+                    }
+                })
+                .catch(err => {
+                    if (err.name !== 'AuthCancelledError') {
+                        showToast('error', err.message);
                     }
                 });
             }
@@ -2741,14 +2923,18 @@ if ($action === 'clear_history') {
             color: '#f7f7f8'
         }).then((result) => {
             if (result.isConfirmed) {
-                fetch('index.php?action=clear_history&session_id=all')
-                .then(res => res.json())
+                adminApi.request('clear_history', { session_id: 'all' })
                 .then(data => {
                     if (data.status === 'success') {
                         showToast('success', data.message);
                         loadHistoryData();
                     } else {
                         showToast('error', data.message);
+                    }
+                })
+                .catch(err => {
+                    if (err.name !== 'AuthCancelledError') {
+                        showToast('error', err.message);
                     }
                 });
             }

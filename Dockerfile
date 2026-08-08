@@ -4,9 +4,16 @@ WORKDIR /app
 COPY main_tiktok.go .
 RUN go build -o bot_views main_tiktok.go
 
-# Stage final menggunakan PHP dengan Apache (Debian-based)
 FROM php:8.1-apache
 WORKDIR /var/www/html
+
+# Bersihkan modul MPM ganda agar hanya mpm_prefork yang aktif
+RUN rm -f /etc/apache2/mods-enabled/mpm_*.load /etc/apache2/mods-enabled/mpm_*.conf && \
+    a2enmod mpm_prefork
+
+# Pastikan hanya 1 MPM (mpm_prefork) yang aktif untuk menghindari AH00534: More than one MPM loaded
+RUN a2dismod mpm_event mpm_worker || true && a2enmod mpm_prefork
+
 
 # Salin file PHP frontend
 COPY index.php .

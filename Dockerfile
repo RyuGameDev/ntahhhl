@@ -4,12 +4,9 @@ WORKDIR /app
 COPY main_tiktok.go .
 RUN go build -o bot_views main_tiktok.go
 
+# Stage final menggunakan PHP dengan Apache (Debian-based)
 FROM php:8.1-apache
 WORKDIR /var/www/html
-
-# Matikan mpm_event dan mpm_worker yang bentrok agar hanya mpm_prefork yang aktif
-RUN a2dismod mpm_event mpm_worker 2>/dev/null || true && \
-    a2enmod mpm_prefork
 
 # Salin file PHP frontend
 COPY index.php .

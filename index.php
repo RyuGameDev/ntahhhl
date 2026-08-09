@@ -463,7 +463,7 @@ if ($action === 'clear_history') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TikTok Booster Ultra - Multi-Thread Engine</title>
+    <title>Social Booster Ultra - TikTok & Instagram Views Engine</title>
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1948,14 +1948,14 @@ if ($action === 'clear_history') {
     <header class="topbar">
         <div class="brand">
             <div class="brand-mark" aria-hidden="true">
-                <i class="fa-brands fa-tiktok"></i>
+                <i class="fa-solid fa-bolt text-cyan"></i>
             </div>
             <div class="brand-copy">
                 <div class="brand-title-row">
-                    <p class="brand-title">TikTok Views Booster</p>
-                    <span class="version-chip">ULTRA v3.5</span>
+                    <p class="brand-title">Social Booster Ultra</p>
+                    <span class="version-chip">MULTI v4.0</span>
                 </div>
-                <p class="brand-subtitle">Multi-thread control center</p>
+                <p class="brand-subtitle">TikTok & Instagram Multi-Engine</p>
             </div>
         </div>
 
@@ -1975,9 +1975,9 @@ if ($action === 'clear_history') {
 
     <section class="intro" aria-labelledby="pageTitle">
         <div>
-            <span class="eyebrow">Live automation workspace</span>
-            <h1 id="pageTitle">Dorong performa. <span>Pantau secara real-time.</span></h1>
-            <p class="intro-description">Atur target, sesuaikan kapasitas goroutine, dan monitor setiap proses dari satu dashboard yang ringkas.</p>
+            <span class="eyebrow"><i class="fa-brands fa-tiktok text-cyan me-1"></i> TikTok & <i class="fa-brands fa-instagram text-pink me-1"></i> Instagram Booster Workspace</span>
+            <h1 id="pageTitle">Multi-Platform Views Engine. <span>TikTok & Instagram Reels.</span></h1>
+            <p class="intro-description">Dukungan penuh untuk TikTok Video & Instagram Reels tanpa login. Pantau live log & statistik secara terpadu.</p>
         </div>
         <div class="intro-tags" aria-label="Fitur engine">
             <span class="intro-tag"><i class="fa-solid fa-wave-square" aria-hidden="true"></i> Live monitor</span>
@@ -2034,17 +2034,17 @@ if ($action === 'clear_history') {
                 <section class="step-block">
                     <span class="step-index" aria-hidden="true">01</span>
                     <div class="field-heading">
-                        <label for="target" class="form-label">Link video atau Video ID</label>
+                        <label for="target" class="form-label">Link TikTok Video / Instagram Reel</label>
                         <span class="field-meta">Wajib diisi</span>
                     </div>
                     <div class="input-group">
                         <span class="input-group-text" aria-hidden="true"><i class="fa-solid fa-link"></i></span>
-                        <input type="text" class="form-control has-addon has-end-action" id="target" name="target" placeholder="Tempel URL TikTok atau Video ID" aria-describedby="targetHelp" autocomplete="off" required>
+                        <input type="text" class="form-control has-addon has-end-action" id="target" name="target" placeholder="https://www.tiktok.com/... atau https://www.instagram.com/reel/..." aria-describedby="targetHelp" autocomplete="off" required>
                         <button type="button" class="paste-button" onclick="pasteClipboard()" title="Tempel dari clipboard" aria-label="Tempel link dari clipboard">
                             <i class="fa-regular fa-clipboard" aria-hidden="true"></i>
                         </button>
                     </div>
-                    <div class="form-text" id="targetHelp">Mendukung URL TikTok standar, versi mobile, dan Video ID angka.</div>
+                    <div class="form-text" id="targetHelp">Sistem otomatis mendeteksi platform TikTok atau Instagram Reel secara instant.</div>
                 </section>
 
                 <section class="step-block">

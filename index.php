@@ -1,460 +1,81 @@
 <?php
-// Set timezone
-date_default_timezone_set('Asia/Jakarta');
+$output_msg = "";
+$status = "";
 
-// Pastikan folder logs tersedia
-$logs_dir = __DIR__ . '/logs';
-if (!is_dir($logs_dir)) {
-    @mkdir($logs_dir, 0755, true);
-}
-
-$sessions_file = __DIR__ . '/sessions.json';
-$active_session_file = __DIR__ . '/active_session.json';
-$pid_path = __DIR__ . '/pid.txt';
-
-// Kirim error API secara konsisten tanpa menyimpan respons sensitif di cache.
-function json_api_error($status_code, $message, $error_code = null) {
-    http_response_code($status_code);
-    header('Content-Type: application/json; charset=utf-8');
-    header('Cache-Control: no-store');
-
-    $response = [
-        'status' => 'error',
-        'message' => $message
-    ];
-
-    if ($error_code !== null) {
-        $response['error_code'] = $error_code;
-    }
-
-    echo json_encode($response);
-    exit;
-}
-
-// Ambil Authorization header pada Apache maupun reverse proxy/FastCGI.
-function get_authorization_header() {
-    foreach (['HTTP_AUTHORIZATION', 'REDIRECT_HTTP_AUTHORIZATION'] as $server_key) {
-        if (!empty($_SERVER[$server_key])) {
-            return trim((string) $_SERVER[$server_key]);
-        }
-    }
-
-    if (function_exists('getallheaders')) {
-        $headers = getallheaders();
-        if (is_array($headers)) {
-            foreach ($headers as $header_name => $header_value) {
-                if (strcasecmp($header_name, 'Authorization') === 0) {
-                    return trim((string) $header_value);
-                }
-            }
-        }
-    }
-
-    return '';
-}
-
-// Lindungi aksi administratif menggunakan ADMIN_TOKEN dari environment Railway.
-function require_admin_auth() {
-    $expected_token = getenv('ADMIN_TOKEN');
-
-    if (!is_string($expected_token) || strlen($expected_token) < 32) {
-        error_log('ADMIN_TOKEN belum dikonfigurasi atau panjangnya kurang dari 32 karakter.');
-        json_api_error(503, 'Autentikasi server belum dikonfigurasi.', 'auth_not_configured');
-    }
-
-    $authorization = get_authorization_header();
-    $provided_token = '';
-
-    if (preg_match('/^Bearer[ \t]+([^\s]+)$/i', $authorization, $matches) === 1) {
-        $provided_token = $matches[1];
-    }
-
-    if ($provided_token === '' || !hash_equals($expected_token, $provided_token)) {
-        header('WWW-Authenticate: Bearer realm="booster-admin"');
-        json_api_error(401, 'Token autentikasi tidak valid.', 'unauthorized');
-    }
-}
-
-// Aksi yang mengubah state wajib menggunakan POST.
-function require_post_request() {
-    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
-        header('Allow: POST');
-        json_api_error(405, 'Method tidak diizinkan. Gunakan POST.', 'method_not_allowed');
-    }
-}
-
-// Utility helper untuk membaca JSON input (cURL / Fetch API compatibility)
-function get_request_data() {
-    $data = $_REQUEST;
-    $raw_input = file_get_contents('php://input');
-    if (!empty($raw_input)) {
-        $json = json_decode($raw_input, true);
-        if (is_array($json)) {
-            $data = array_merge($data, $json);
-        }
-    }
-    return $data;
-}
-
-// Utility helper untuk membaca daftar semua sesi dari sessions.json
-function load_sessions() {
-    global $sessions_file;
-    if (file_exists($sessions_file)) {
-        $content = file_get_contents($sessions_file);
-        $decoded = json_decode($content, true);
-        if (is_array($decoded)) {
-            return $decoded;
-        }
-    }
-    return [];
-}
-
-// Utility helper untuk menyimpan daftar sesi ke sessions.json
-function save_sessions($sessions) {
-    global $sessions_file;
-    file_put_contents($sessions_file, json_encode($sessions, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-}
-
-// Utility helper untuk menyimpan 1 sesi
-function update_session_record($session_data) {
-    $sessions = load_sessions();
-    $sessions[$session_data['session_id']] = $session_data;
-    save_sessions($sessions);
-}
-
-// Utility helper untuk mengecek apakah PID masih berjalan di OS / Docker Container
-function is_process_running($pid) {
-    $pid = intval($pid);
-    if ($pid <= 0) return false;
-    if (function_exists('posix_kill')) {
-        return @posix_kill($pid, 0);
-    }
-    if (file_exists("/proc/$pid")) {
-        return true;
-    }
-    $out = [];
-    exec("ps -p " . $pid, $out);
-    return count($out) > 1;
-}
-
-// Utility helper untuk sinkronisasi state aktif
-function get_current_active_session() {
-    global $active_session_file, $pid_path;
-    if (!file_exists($active_session_file)) {
-        return null;
-    }
-    $active = json_decode(file_get_contents($active_session_file), true);
-    if (!is_array($active) || empty($active['session_id'])) {
-        @unlink($active_session_file);
-        @unlink($pid_path);
-        return null;
-    }
-
-    $pid = intval($active['pid'] ?? 0);
-    if (!is_process_running($pid)) {
-        // Proses sudah selesai di background
-        $sessions = load_sessions();
-        if (isset($sessions[$active['session_id']])) {
-            if ($sessions[$active['session_id']]['status'] === 'running') {
-                $sessions[$active['session_id']]['status'] = 'completed';
-                $sessions[$active['session_id']]['ended_at'] = date('Y-m-d H:i:s');
-                save_sessions($sessions);
-            }
-        }
-        @unlink($active_session_file);
-        @unlink($pid_path);
-        return null;
-    }
-
-    // Hitung durasi berjalan
-    if (!empty($active['started_at'])) {
-        $active['duration_seconds'] = time() - strtotime($active['started_at']);
-    }
-
-    return $active;
-}
-
-// ----------------------------------------------------
-// ROUTING HANDLER ACTION (JSON API & cURL Compatible)
-// ----------------------------------------------------
-
-$action = $_GET['action'] ?? null;
-
-// Aksi mutasi hanya boleh dipanggil melalui POST dengan Bearer token yang valid.
-if (in_array($action, ['run', 'stop', 'clear_history'], true)) {
-    require_post_request();
-    require_admin_auth();
-}
-
-// 1. ACTION: RUN (Mulai booster baru)
-if ($action === 'run') {
+// Mengirim response JSON jika dipicu lewat AJAX request
+if (isset($_GET['action']) && $_GET['action'] === 'run') {
     header('Content-Type: application/json');
-    $req = get_request_data();
-    
-    $target = trim($req['target'] ?? '');
-    $quantity = intval($req['quantity'] ?? 0);
-    $threads = intval($req['threads'] ?? 300);
+    $target = trim($_POST['target'] ?? '');
+    $quantity = intval($_POST['quantity'] ?? 0);
+    $threads = intval($_POST['threads'] ?? 300);
     if ($threads < 1) $threads = 1;
-    if ($threads > 10000) $threads = 10000;
-    $proxy = trim($req['proxy'] ?? '');
+    if ($threads > 10000) $threads = 10000; // Dukungan penuh hingga 5000 - 10000 threads
+    $proxy = trim($_POST['proxy'] ?? '');
 
     if (empty($target) || $quantity <= 0) {
-        echo json_encode([
-            'status' => 'error',
-            'message' => 'Harap masukkan Link Video dan Jumlah target dengan benar.'
-        ]);
+        echo json_encode(['status' => 'error', 'message' => 'Harap masukkan Link Video dan Jumlah dengan benar.']);
         exit;
     }
 
-    // Cek apakah ada sesi lain yang sedang aktif berjalan
-    $current_active = get_current_active_session();
-    if ($current_active !== null) {
-        echo json_encode([
-            'status' => 'error',
-            'message' => 'Masih ada proses booster aktif dengan Session ID: ' . $current_active['session_id'],
-            'data' => $current_active
-        ]);
-        exit;
-    }
+    $binary_path = __DIR__ . '/bot_views'; 
 
-    // Generate Session ID unik
-    $session_id = 'sess_' . date('Ymd_His') . '_' . substr(md5(uniqid()), 0, 4);
-    $log_rel_path = "logs/{$session_id}.log";
-    $log_abs_path = __DIR__ . '/' . $log_rel_path;
-    $binary_path = __DIR__ . '/bot_views';
+    // Kosongkan/buat file log baru
+    file_put_contents(__DIR__ . '/output.log', "[*] Mempersiapkan views booster...\n");
 
-    // Inisialisasi file log sesi dan output.log (untuk backward compatibility)
-    $init_header = "[+] Session ID: {$session_id}\n[*] Mempersiapkan TikTok views booster...\n[*] Target: {$target}\n[*] Quantity: {$quantity}\n[*] Threads: {$threads}\n" . (!empty($proxy) ? "[*] Proxy: {$proxy}\n" : "") . "-------------------------------------------------\n";
-    file_put_contents($log_abs_path, $init_header);
-    file_put_contents(__DIR__ . '/output.log', $init_header);
-
-    // Build command & escape arguments
+    // Escape argumen secara individual (aman dari shell injection)
     $target_esc = escapeshellarg($target);
     $quantity_esc = escapeshellarg($quantity);
     $threads_esc = escapeshellarg($threads);
 
+    // Tambahkan parameter proxy jika diinput
     if (!empty($proxy)) {
         $proxy_esc = escapeshellarg($proxy);
         $cmd = "$binary_path $target_esc $quantity_esc $threads_esc $proxy_esc";
     } else {
         $cmd = "$binary_path $target_esc $quantity_esc $threads_esc";
     }
-
-    $log_abs_esc = escapeshellarg($log_abs_path);
-    $pid_path_esc = escapeshellarg($pid_path);
-
-    // Exec di background dan alirkan output ke log file sesi & sync ke output.log
-    exec("$cmd > $log_abs_esc 2>&1 & echo \$! > $pid_path_esc");
-
-    // Ambil PID
-    $pid = 0;
-    if (file_exists($pid_path)) {
-        $pid = intval(trim(file_get_contents($pid_path)));
-    }
-
-    $session_data = [
-        'session_id' => $session_id,
-        'pid' => $pid,
-        'target' => $target,
-        'quantity' => $quantity,
-        'threads' => $threads,
-        'proxy' => $proxy,
-        'status' => 'running',
-        'started_at' => date('Y-m-d H:i:s'),
-        'ended_at' => null,
-        'log_file' => $log_rel_path
-    ];
-
-    // Simpan ke database JSON & active session
-    update_session_record($session_data);
-    file_put_contents($active_session_file, json_encode($session_data, JSON_PRETTY_PRINT));
+    
+    // Jalankan secara asynchronous di background dan catat Process ID (PID)
+    $pid_path = __DIR__ . '/pid.txt';
+    exec("$cmd > output.log 2>&1 & echo \$! > " . escapeshellarg($pid_path));
 
     echo json_encode([
-        'status' => 'success',
-        'message' => "Booster berhasil dijalankan [ID: {$session_id}] dengan " . number_format($threads) . " threads!",
-        'data' => $session_data
+        'status' => 'success', 
+        'message' => 'Booster berhasil dijalankan dengan ' . number_format($threads) . ' threads!'
     ]);
     exit;
 }
 
-// 2. ACTION: STOP (Hentikan booster)
-if ($action === 'stop') {
+// Endpoint untuk menghentikan proses booster
+if (isset($_GET['action']) && $_GET['action'] === 'stop') {
     header('Content-Type: application/json');
-    $req = get_request_data();
-    $target_session_id = trim($req['session_id'] ?? '');
-
-    $current_active = get_current_active_session();
-    $sessions = load_sessions();
-
-    $stopped_data = null;
-
+    $pid_path = __DIR__ . '/pid.txt';
     if (file_exists($pid_path)) {
         $pid = intval(trim(file_get_contents($pid_path)));
         if ($pid > 0) {
+            // Hentikan proses binary di Linux secara paksa (SIGKILL)
             exec("kill -9 $pid");
+            
+            // Tulis info penghentian ke file log
+            file_put_contents(__DIR__ . '/output.log', "\n[!] Booster dihentikan secara paksa oleh pengguna.\n", FILE_APPEND);
         }
         @unlink($pid_path);
-    }
-
-    if ($current_active !== null) {
-        $sid = $current_active['session_id'];
-        $log_abs = __DIR__ . '/logs/' . $sid . '.log';
-        $stop_msg = "\n[!] Booster dihentikan secara paksa oleh pengguna pada " . date('Y-m-d H:i:s') . ".\n";
-        
-        if (file_exists($log_abs)) {
-            file_put_contents($log_abs, $stop_msg, FILE_APPEND);
-        }
-        file_put_contents(__DIR__ . '/output.log', $stop_msg, FILE_APPEND);
-
-        if (isset($sessions[$sid])) {
-            $sessions[$sid]['status'] = 'stopped';
-            $sessions[$sid]['ended_at'] = date('Y-m-d H:i:s');
-            save_sessions($sessions);
-            $stopped_data = $sessions[$sid];
-        }
-
-        @unlink($active_session_file);
-    }
-
-    echo json_encode([
-        'status' => 'success',
-        'message' => 'Proses booster berhasil dihentikan!',
-        'data' => $stopped_data
-    ]);
-    exit;
-}
-
-// 3. ACTION: GET_STATUS (Status real-time untuk reconnect/cURL)
-if ($action === 'get_status') {
-    header('Content-Type: application/json');
-    $active = get_current_active_session();
-    
-    echo json_encode([
-        'status' => 'success',
-        'running' => ($active !== null),
-        'active_session' => $active
-    ]);
-    exit;
-}
-
-// 4. ACTION: GET_LOG (Baca log sesi tertentu atau sesi aktif)
-if ($action === 'get_log') {
-    $req = get_request_data();
-    $sid = trim($req['session_id'] ?? '');
-    $format = trim($req['format'] ?? '');
-    $is_full = intval($req['full'] ?? 0); // 1 = full log (untuk viewer/download), 0 = tail 500 baris untuk live view
-    
-    $log_content = "";
-    
-    if (!empty($sid)) {
-        $log_file = __DIR__ . '/logs/' . preg_replace('/[^a-zA-Z0-9_-]/', '', $sid) . '.log';
-        if (file_exists($log_file)) {
-            $log_content = file_get_contents($log_file);
-        } else {
-            $log_content = "[!] Log untuk Session ID {$sid} tidak ditemukan.";
-        }
+        echo json_encode(['status' => 'success', 'message' => 'Proses booster berhasil dihentikan!']);
     } else {
-        $active = get_current_active_session();
-        if ($active !== null && !empty($active['session_id'])) {
-            $log_file = __DIR__ . '/logs/' . $active['session_id'] . '.log';
-            if (file_exists($log_file)) {
-                $log_content = file_get_contents($log_file);
-            }
-        }
-        if (empty($log_content) && file_exists(__DIR__ . '/output.log')) {
-            $log_content = file_get_contents(__DIR__ . '/output.log');
-        }
+        echo json_encode(['status' => 'error', 'message' => 'Tidak ada proses booster aktif yang ditemukan.']);
     }
+    exit;
+}
 
-    if (empty($log_content)) {
-        $log_content = "[*] Belum ada aktivitas log.";
-    }
-
-    $is_json_request = ($format === 'json') || (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false);
-
-    if ($is_json_request) {
-        header('Content-Type: application/json');
-        echo json_encode([
-            'status' => 'success',
-            'session_id' => $sid,
-            'log' => $log_content
-        ]);
+// Endpoint untuk membaca log secara real-time
+if (isset($_GET['action']) && $_GET['action'] === 'get_log') {
+    header('Content-Type: text/plain');
+    $log_path = __DIR__ . '/output.log';
+    if (file_exists($log_path)) {
+        echo file_get_contents($log_path);
     } else {
-        header('Content-Type: text/plain; charset=utf-8');
-        echo $log_content;
+        echo "[*] Belum ada aktivitas log.";
     }
-    exit;
-}
-
-// 5. ACTION: GET_HISTORY (Daftar semua riwayat sesi)
-if ($action === 'get_history') {
-    header('Content-Type: application/json');
-    
-    // Refresh active session status dulu
-    get_current_active_session();
-    
-    $sessions = load_sessions();
-    // Urutkan dari yang terbaru (descending)
-    usort($sessions, function($a, $b) {
-        return strtotime($b['started_at'] ?? '0') - strtotime($a['started_at'] ?? '0');
-    });
-
-    echo json_encode([
-        'status' => 'success',
-        'total' => count($sessions),
-        'sessions' => $sessions
-    ]);
-    exit;
-}
-
-// 6. ACTION: CLEAR_HISTORY (Hapus 1 atau semua riwayat log)
-if ($action === 'clear_history') {
-    header('Content-Type: application/json');
-    $req = get_request_data();
-    $sid = trim($req['session_id'] ?? '');
-
-    $sessions = load_sessions();
-
-    if ($sid === 'all') {
-        foreach ($sessions as $s) {
-            if ($s['status'] !== 'running' && !empty($s['log_file'])) {
-                @unlink(__DIR__ . '/' . $s['log_file']);
-            }
-        }
-        // Simpan hanya sesi running jika ada
-        $sessions = array_filter($sessions, function($s) {
-            return $s['status'] === 'running';
-        });
-        save_sessions($sessions);
-
-        echo json_encode([
-            'status' => 'success',
-            'message' => 'Semua riwayat sesi berhasil dibersihkan.'
-        ]);
-        exit;
-    } elseif (!empty($sid)) {
-        if (isset($sessions[$sid])) {
-            if ($sessions[$sid]['status'] === 'running') {
-                echo json_encode([
-                    'status' => 'error',
-                    'message' => 'Sesi sedang berjalan dan tidak dapat dihapus.'
-                ]);
-                exit;
-            }
-            if (!empty($sessions[$sid]['log_file'])) {
-                @unlink(__DIR__ . '/' . $sessions[$sid]['log_file']);
-            }
-            unset($sessions[$sid]);
-            save_sessions($sessions);
-            echo json_encode([
-                'status' => 'success',
-                'message' => "Riwayat sesi {$sid} berhasil dihapus."
-            ]);
-            exit;
-        }
-    }
-
-    echo json_encode(['status' => 'error', 'message' => 'Session ID tidak valid.']);
     exit;
 }
 ?>
@@ -463,7 +84,7 @@ if ($action === 'clear_history') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Social Booster Ultra - TikTok & Instagram Views Engine</title>
+    <title>TikTok Booster Ultra - Multi-Thread Engine</title>
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -496,63 +117,6 @@ if ($action === 'clear_history') {
             --radius-lg: 18px;
             --radius-md: 13px;
             --shadow: 0 30px 80px rgba(0, 0, 0, 0.38);
-        }
-
-        /* Modal Custom Styles */
-        .modal-content.dark-modal {
-            background: #111116;
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
-            color: #f7f7f8;
-            border-radius: 16px;
-        }
-
-        .modal-content.dark-modal .modal-header {
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            padding: 16px 20px;
-        }
-
-        .modal-content.dark-modal .modal-footer {
-            border-top: 1px solid rgba(255, 255, 255, 0.08);
-            padding: 12px 20px;
-        }
-
-        .modal-content.dark-modal .table {
-            color: #f7f7f8;
-            margin-bottom: 0;
-        }
-
-        .modal-content.dark-modal .table th {
-            border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-            color: #92929f;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            background: rgba(255, 255, 255, 0.02);
-            padding: 12px 16px;
-        }
-
-        .modal-content.dark-modal .table td {
-            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-            vertical-align: middle;
-            font-size: 13px;
-            padding: 12px 16px;
-        }
-
-        .history-terminal {
-            background: #08080c;
-            border-radius: 12px;
-            padding: 16px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12.5px;
-            height: 480px;
-            max-height: 480px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-break: break-word;
-            color: #d1d1e0;
-            margin: 0;
-            border: 1px solid rgba(255, 255, 255, 0.08);
         }
 
         * {
@@ -1630,8 +1194,7 @@ if ($action === 'clear_history') {
 
         .terminal-body {
             flex: 1 1 auto;
-            min-height: 480px;
-            max-height: 520px;
+            min-height: 0;
             padding: 22px;
             overflow-y: auto;
             background:
@@ -1948,14 +1511,14 @@ if ($action === 'clear_history') {
     <header class="topbar">
         <div class="brand">
             <div class="brand-mark" aria-hidden="true">
-                <i class="fa-solid fa-bolt text-cyan"></i>
+                <i class="fa-brands fa-tiktok"></i>
             </div>
             <div class="brand-copy">
                 <div class="brand-title-row">
-                    <p class="brand-title">Social Booster Ultra</p>
-                    <span class="version-chip">MULTI v4.0</span>
+                    <p class="brand-title">TikTok Views Booster</p>
+                    <span class="version-chip">ULTRA v3.5</span>
                 </div>
-                <p class="brand-subtitle">TikTok & Instagram Multi-Engine</p>
+                <p class="brand-subtitle">Multi-thread control center</p>
             </div>
         </div>
 
@@ -1975,9 +1538,9 @@ if ($action === 'clear_history') {
 
     <section class="intro" aria-labelledby="pageTitle">
         <div>
-            <span class="eyebrow"><i class="fa-brands fa-tiktok text-cyan me-1"></i> TikTok & <i class="fa-brands fa-instagram text-pink me-1"></i> Instagram Booster Workspace</span>
-            <h1 id="pageTitle">Multi-Platform Views Engine. <span>TikTok & Instagram Reels.</span></h1>
-            <p class="intro-description">Dukungan penuh untuk TikTok Video & Instagram Reels tanpa login. Pantau live log & statistik secara terpadu.</p>
+            <span class="eyebrow">Live automation workspace</span>
+            <h1 id="pageTitle">Dorong performa. <span>Pantau secara real-time.</span></h1>
+            <p class="intro-description">Atur target, sesuaikan kapasitas goroutine, dan monitor setiap proses dari satu dashboard yang ringkas.</p>
         </div>
         <div class="intro-tags" aria-label="Fitur engine">
             <span class="intro-tag"><i class="fa-solid fa-wave-square" aria-hidden="true"></i> Live monitor</span>
@@ -2034,17 +1597,17 @@ if ($action === 'clear_history') {
                 <section class="step-block">
                     <span class="step-index" aria-hidden="true">01</span>
                     <div class="field-heading">
-                        <label for="target" class="form-label">Link TikTok Video / Instagram Reel</label>
+                        <label for="target" class="form-label">Link video atau Video ID</label>
                         <span class="field-meta">Wajib diisi</span>
                     </div>
                     <div class="input-group">
                         <span class="input-group-text" aria-hidden="true"><i class="fa-solid fa-link"></i></span>
-                        <input type="text" class="form-control has-addon has-end-action" id="target" name="target" placeholder="https://www.tiktok.com/... atau https://www.instagram.com/reel/..." aria-describedby="targetHelp" autocomplete="off" required>
+                        <input type="text" class="form-control has-addon has-end-action" id="target" name="target" placeholder="Tempel URL TikTok atau Video ID" aria-describedby="targetHelp" autocomplete="off" required>
                         <button type="button" class="paste-button" onclick="pasteClipboard()" title="Tempel dari clipboard" aria-label="Tempel link dari clipboard">
                             <i class="fa-regular fa-clipboard" aria-hidden="true"></i>
                         </button>
                     </div>
-                    <div class="form-text" id="targetHelp">Sistem otomatis mendeteksi platform TikTok atau Instagram Reel secara instant.</div>
+                    <div class="form-text" id="targetHelp">Mendukung URL TikTok standar, versi mobile, dan Video ID angka.</div>
                 </section>
 
                 <section class="step-block">
@@ -2134,9 +1697,6 @@ if ($action === 'clear_history') {
                 </div>
 
                 <div class="terminal-actions">
-                    <button type="button" class="btn btn-sm btn-outline-info text-nowrap me-2" onclick="openHistoryModal()" style="border-radius: 8px; font-size: 12px; padding: 4px 10px;">
-                        <i class="fa-solid fa-clock-rotate-left me-1"></i>Riwayat Sesi
-                    </button>
                     <div class="auto-scroll-control form-check form-switch">
                         <input class="form-check-input" type="checkbox" id="autoScrollCheck" checked>
                         <label for="autoScrollCheck">Auto-scroll</label>
@@ -2175,217 +1735,11 @@ if ($action === 'clear_history') {
     </footer>
 </main>
 
-<!-- Modal Riwayat Sesi -->
-<div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content dark-modal">
-            <div class="modal-header">
-                <h5 class="modal-title" id="historyModalLabel">
-                    <i class="fa-solid fa-clock-rotate-left text-info me-2"></i>Riwayat Sesi & Log
-                </h5>
-                <div class="d-flex align-items-center gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearAllHistory()" title="Hapus Semua Riwayat">
-                        <i class="fa-solid fa-trash-can me-1"></i>Bersihkan Semua
-                    </button>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-            </div>
-            <div class="modal-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0" id="historyTable">
-                        <thead>
-                            <tr>
-                                <th class="ps-3">Sesi ID & Waktu</th>
-                                <th>Target & Threads</th>
-                                <th>Status</th>
-                                <th class="text-end pe-3">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody id="historyTableBody">
-                            <tr>
-                                <td colspan="4" class="text-center py-4 text-muted">
-                                    <i class="fa-solid fa-spinner fa-spin me-2"></i>Memuat riwayat...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal Log Viewer -->
-<div class="modal fade" id="logViewerModal" tabindex="-1" aria-labelledby="logViewerModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content dark-modal">
-            <div class="modal-header">
-                <h5 class="modal-title" id="logViewerModalLabel">
-                    <i class="fa-solid fa-terminal text-info me-2"></i>Detail Log: <span id="viewerSessionId" class="text-cyan"></span>
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <pre class="history-terminal" id="viewerTerminalContent">[*] Memuat isi log...</pre>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyViewerLogs()">
-                    <i class="fa-regular fa-copy me-1"></i>Salin Log
-                </button>
-                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Tutup</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
 <script>
     let pollInterval = null;
     let targetViewsGoal = 0;
     let engineRunning = false;
     let logRequestInFlight = false;
-    let currentPollingSessionId = null;
-
-    let historyModalInstance = null;
-    let logViewerModalInstance = null;
-
-    // Token hanya disimpan di memori halaman dan tidak pernah ditanam di source code.
-    const adminApi = (() => {
-        let token = '';
-        let promptPromise = null;
-
-        function cancelledAuthError() {
-            const error = new Error('Autentikasi dibatalkan.');
-            error.name = 'AuthCancelledError';
-            return error;
-        }
-
-        async function getToken(forcePrompt = false) {
-            if (!forcePrompt && token) return token;
-            if (promptPromise) return promptPromise;
-
-            if (typeof Swal === 'undefined') {
-                throw new Error('Dialog autentikasi tidak tersedia. Muat ulang halaman lalu coba lagi.');
-            }
-
-            promptPromise = Swal.fire({
-                title: 'Autentikasi Admin',
-                text: 'Masukkan ADMIN_TOKEN untuk melanjutkan aksi ini.',
-                icon: 'info',
-                input: 'password',
-                inputPlaceholder: 'ADMIN_TOKEN',
-                inputAttributes: {
-                    autocomplete: 'off',
-                    autocapitalize: 'none',
-                    spellcheck: 'false'
-                },
-                showCancelButton: true,
-                confirmButtonText: 'Autentikasi',
-                cancelButtonText: 'Batal',
-                confirmButtonColor: '#25f4ee',
-                cancelButtonColor: '#2b2b36',
-                background: '#17171e',
-                color: '#f7f7f8',
-                inputValidator: value => value && value.trim() ? undefined : 'Token wajib diisi.'
-            }).then(result => {
-                if (!result.isConfirmed) {
-                    throw cancelledAuthError();
-                }
-
-                token = result.value.trim();
-                return token;
-            }).finally(() => {
-                promptPromise = null;
-            });
-
-            return promptPromise;
-        }
-
-        async function request(action, body = {}, retried = false) {
-            const activeToken = await getToken(retried);
-            const isFormData = body instanceof FormData;
-            const headers = new Headers({
-                'Accept': 'application/json',
-                'Authorization': `Bearer ${activeToken}`
-            });
-
-            if (!isFormData) {
-                headers.set('Content-Type', 'application/json');
-            }
-
-            const response = await fetch(`index.php?action=${encodeURIComponent(action)}`, {
-                method: 'POST',
-                headers,
-                body: isFormData ? body : JSON.stringify(body || {})
-            });
-
-            const data = await response.json().catch(() => ({
-                status: 'error',
-                message: `Respons server tidak valid (${response.status}).`
-            }));
-
-            if (response.status === 401 && !retried) {
-                token = '';
-                showToast('error', 'Token salah. Silakan masukkan ulang.');
-                return request(action, body, true);
-            }
-
-            if (!response.ok) {
-                throw new Error(data.message || `Request gagal (${response.status}).`);
-            }
-
-            return data;
-        }
-
-        return { request };
-    })();
-
-    document.addEventListener('DOMContentLoaded', function() {
-        checkActiveStatusOnLoad();
-    });
-
-    function checkActiveStatusOnLoad() {
-        fetch('index.php?action=get_status')
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success' && data.running && data.active_session) {
-                const sess = data.active_session;
-                engineRunning = true;
-                currentPollingSessionId = sess.session_id;
-
-                if (sess.target) document.getElementById('target').value = sess.target;
-                if (sess.quantity) {
-                    document.getElementById('quantity').value = sess.quantity;
-                    document.getElementById('cardTarget').innerText = Number(sess.quantity).toLocaleString('id-ID');
-                    targetViewsGoal = sess.quantity;
-                }
-                if (sess.threads) {
-                    document.getElementById('threads').value = sess.threads;
-                    document.getElementById('threadRange').value = Math.max(10, sess.threads);
-                    updateThreadDisplay(sess.threads);
-                }
-                if (sess.proxy) document.getElementById('proxy').value = sess.proxy;
-
-                const btn = document.getElementById('submitBtn');
-                const stopBtn = document.getElementById('stopBtn');
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2" aria-hidden="true"></i>Menjalankan...';
-                btn.disabled = true;
-                stopBtn.disabled = false;
-                document.getElementById('resetBtn').disabled = true;
-
-                setEngineStatus('BERJALAN', 'running');
-                showToast('info', 'Terhubung kembali ke sesi [' + sess.session_id + ']');
-
-                if (pollInterval) clearInterval(pollInterval);
-                fetchLogs();
-                pollInterval = setInterval(fetchLogs, 400);
-            }
-        })
-        .catch(err => {
-            console.error('Failed to check active status:', err);
-        });
-    }
 
     function showToast(icon, title) {
         if (typeof Swal === 'undefined') return;
@@ -2577,13 +1931,14 @@ if ($action === 'clear_history') {
         formData.append('threads', threads);
         formData.append('proxy', proxy);
 
-        // Request terlindungi dengan Bearer token dari dialog admin.
-        adminApi.request('run', formData)
+        // Fetch execution API
+        fetch('index.php?action=run', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
         .then(data => {
             if (data.status === 'success') {
-                if (data.data && data.data.session_id) {
-                    currentPollingSessionId = data.data.session_id;
-                }
                 terminal.textContent += `[✓] ${data.message}\n[*] Memulai pemantauan log real-time...\n\n`;
                 showToast('success', 'Booster berhasil dijalankan');
 
@@ -2597,12 +1952,7 @@ if ($action === 'clear_history') {
             }
         })
         .catch(err => {
-            if (err.name === 'AuthCancelledError') {
-                resetUI();
-                return;
-            }
             terminal.textContent += `[!] Error server: ${err.message}\n`;
-            showToast('error', err.message);
             resetUI();
         });
     });
@@ -2615,31 +1965,22 @@ if ($action === 'clear_history') {
         stopBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1" aria-hidden="true"></i>Stop...';
         terminal.textContent += '\n[!] Mengirim sinyal penghentian ke server...\n';
 
-        adminApi.request('stop', {})
+        fetch('index.php?action=stop')
+        .then(res => res.json())
         .then(data => {
             if (data.status === 'success') {
                 terminal.textContent += `[✓] ${data.message}\n`;
-                clearInterval(pollInterval);
-                fetchLogs();
-                resetUI('STOPPED');
             } else {
                 terminal.textContent += `[!] Error: ${data.message}\n`;
-                stopBtn.disabled = false;
-                stopBtn.innerHTML = '<i class="fa-solid fa-square me-1" aria-hidden="true"></i>Stop';
-                showToast('error', data.message);
             }
+            clearInterval(pollInterval);
+            fetchLogs(); 
+            resetUI('STOPPED');
         })
         .catch(err => {
-            stopBtn.disabled = false;
-            stopBtn.innerHTML = '<i class="fa-solid fa-square me-1" aria-hidden="true"></i>Stop';
-
-            if (err.name === 'AuthCancelledError') {
-                terminal.textContent += '[*] Penghentian dibatalkan; proses tetap berjalan.\n';
-                return;
-            }
-
             terminal.textContent += `[!] Gagal menghentikan: ${err.message}\n`;
-            showToast('error', err.message);
+            clearInterval(pollInterval);
+            resetUI('STOPPED');
         });
     });
 
@@ -2673,14 +2014,6 @@ if ($action === 'clear_history') {
             .replace(/(\[✓\][^\n]*)/g, '<span class="log-success">$1</span>');
     }
 
-    // Event listener untuk Auto-scroll switch
-    document.getElementById('autoScrollCheck').addEventListener('change', function() {
-        if (this.checked) {
-            const terminal = document.getElementById('terminalLog');
-            terminal.scrollTop = terminal.scrollHeight;
-        }
-    });
-
     function fetchLogs() {
         if (logRequestInFlight) return Promise.resolve();
 
@@ -2688,26 +2021,16 @@ if ($action === 'clear_history') {
         const terminal = document.getElementById('terminalLog');
         const autoScroll = document.getElementById('autoScrollCheck').checked;
 
-        // Simpan posisi scroll sebelum update log
-        const prevScrollTop = terminal.scrollTop;
-
-        const url = currentPollingSessionId 
-            ? `index.php?action=get_log&session_id=${encodeURIComponent(currentPollingSessionId)}`
-            : 'index.php?action=get_log';
-
-        return fetch(url)
+        return fetch('index.php?action=get_log')
         .then(res => res.text())
         .then(text => {
             terminal.innerHTML = colorizeLogs(text);
             
             if (autoScroll) {
-                // Auto-scroll ON: scroll otomatis ke bagian paling bawah
                 terminal.scrollTop = terminal.scrollHeight;
-            } else {
-                // Auto-scroll OFF: pertahankan posisi scroll manual pengguna!
-                terminal.scrollTop = prevScrollTop;
             }
 
+            // Parse progress views count & rate from log if available (e.g., "views: 450/1000  rate: 120/s")
             const viewsMatch = text.match(/views:\s*([\d,]+)\s*\/\s*([\d,]+|\?)/i);
             const rateMatch = text.match(/rate:\s*([\d,]+(?:\.\d+)?)\/s/i);
 
@@ -2727,7 +2050,6 @@ if ($action === 'clear_history') {
 
             if (text.includes('[✓] Selesai!') || text.includes('[!] Gagal') || text.includes('dihentikan secara paksa') || text.includes('tidak valid!')) {
                 clearInterval(pollInterval);
-                currentPollingSessionId = null;
                 if (text.includes('[✓] Selesai!')) {
                     setProgress(100, targetViewsGoal, targetViewsGoal);
                     resetUI('FINISHED');
@@ -2749,7 +2071,6 @@ if ($action === 'clear_history') {
         const stopBtn = document.getElementById('stopBtn');
 
         engineRunning = false;
-        currentPollingSessionId = null;
         btn.innerHTML = '<i class="fa-solid fa-bolt me-2" aria-hidden="true"></i>Mulai Booster';
         btn.disabled = false;
         stopBtn.innerHTML = '<i class="fa-solid fa-square me-1" aria-hidden="true"></i>Stop';
@@ -2780,165 +2101,6 @@ if ($action === 'clear_history') {
             console.error('Copy log failed:', err);
             showToast('warning', 'Log tidak dapat disalin');
         }
-    }
-
-    function openHistoryModal() {
-        const modalEl = document.getElementById('historyModal');
-        if (!historyModalInstance) {
-            historyModalInstance = new bootstrap.Modal(modalEl);
-        }
-        historyModalInstance.show();
-        loadHistoryData();
-    }
-
-    function loadHistoryData() {
-        const tbody = document.getElementById('historyTableBody');
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted"><i class="fa-solid fa-spinner fa-spin me-2"></i>Memuat riwayat sesi...</td></tr>';
-
-        fetch('index.php?action=get_history')
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success' && Array.isArray(data.sessions) && data.sessions.length > 0) {
-                tbody.innerHTML = data.sessions.map(s => {
-                    let badgeClass = 'bg-secondary';
-                    let statusLabel = s.status ? s.status.toUpperCase() : 'UNKNOWN';
-
-                    if (s.status === 'running') {
-                        badgeClass = 'bg-info text-dark';
-                    } else if (s.status === 'completed') {
-                        badgeClass = 'bg-success';
-                    } else if (s.status === 'stopped') {
-                        badgeClass = 'bg-danger';
-                    }
-
-                    const targetShort = s.target ? (s.target.length > 35 ? s.target.substring(0, 35) + '...' : s.target) : '-';
-
-                    return `
-                        <tr>
-                            <td class="ps-3">
-                                <div class="fw-semibold text-info">${escapeHtml(s.session_id)}</div>
-                                <div class="text-muted small"><i class="fa-regular fa-clock me-1"></i>${escapeHtml(s.started_at || '-')}</div>
-                            </td>
-                            <td>
-                                <div class="text-truncate" style="max-width: 260px;" title="${escapeHtml(s.target)}">${escapeHtml(targetShort)}</div>
-                                <div class="small text-muted">${Number(s.threads || 0).toLocaleString('id-ID')} Threads · ${Number(s.quantity || 0).toLocaleString('id-ID')} Goal</div>
-                            </td>
-                            <td><span class="badge ${badgeClass}">${escapeHtml(statusLabel)}</span></td>
-                            <td class="text-end pe-3">
-                                <button type="button" class="btn btn-sm btn-outline-info me-1" onclick="viewSessionLog('${escapeHtml(s.session_id)}')">
-                                    <i class="fa-solid fa-terminal me-1"></i>Log
-                                </button>
-                                ${s.status !== 'running' ? `
-                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteHistorySession('${escapeHtml(s.session_id)}')">
-                                        <i class="fa-solid fa-trash-can"></i>
-                                    </button>
-                                ` : ''}
-                            </td>
-                        </tr>
-                    `;
-                }).join('');
-            } else {
-                tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted">Belum ada riwayat sesi tersimpan.</td></tr>';
-            }
-        })
-        .catch(err => {
-            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-danger">Gagal memuat riwayat: ${escapeHtml(err.message)}</td></tr>`;
-        });
-    }
-
-    function viewSessionLog(sessionId) {
-        document.getElementById('viewerSessionId').innerText = sessionId;
-        const terminalEl = document.getElementById('viewerTerminalContent');
-        terminalEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Membaca file log...';
-
-        const modalEl = document.getElementById('logViewerModal');
-        if (!logViewerModalInstance) {
-            logViewerModalInstance = new bootstrap.Modal(modalEl);
-        }
-        logViewerModalInstance.show();
-
-        fetch(`index.php?action=get_log&full=1&session_id=${encodeURIComponent(sessionId)}`)
-        .then(res => res.text())
-        .then(text => {
-            terminalEl.innerHTML = colorizeLogs(text);
-        })
-        .catch(err => {
-            terminalEl.innerText = '[!] Gagal membaca log: ' + err.message;
-        });
-    }
-
-    async function copyViewerLogs() {
-        const text = document.getElementById('viewerTerminalContent').innerText;
-        try {
-            await navigator.clipboard.writeText(text);
-            showToast('success', 'Log berhasil disalin');
-        } catch (err) {
-            showToast('warning', 'Log tidak dapat disalin');
-        }
-    }
-
-    function deleteHistorySession(sessionId) {
-        Swal.fire({
-            title: 'Hapus Riwayat?',
-            text: `Yakin ingin menghapus sesi ${sessionId}?`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#ff5d72',
-            cancelButtonColor: '#2b2b36',
-            confirmButtonText: 'Ya, Hapus',
-            cancelButtonText: 'Batal',
-            background: '#17171e',
-            color: '#f7f7f8'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                adminApi.request('clear_history', { session_id: sessionId })
-                .then(data => {
-                    if (data.status === 'success') {
-                        showToast('success', data.message);
-                        loadHistoryData();
-                    } else {
-                        showToast('error', data.message);
-                    }
-                })
-                .catch(err => {
-                    if (err.name !== 'AuthCancelledError') {
-                        showToast('error', err.message);
-                    }
-                });
-            }
-        });
-    }
-
-    function clearAllHistory() {
-        Swal.fire({
-            title: 'Bersihkan Semua Riwayat?',
-            text: 'Semua log sesi terdahulu (yang tidak sedang berjalan) akan dihapus permanen.',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#ff5d72',
-            cancelButtonColor: '#2b2b36',
-            confirmButtonText: 'Ya, Hapus Semua',
-            cancelButtonText: 'Batal',
-            background: '#17171e',
-            color: '#f7f7f8'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                adminApi.request('clear_history', { session_id: 'all' })
-                .then(data => {
-                    if (data.status === 'success') {
-                        showToast('success', data.message);
-                        loadHistoryData();
-                    } else {
-                        showToast('error', data.message);
-                    }
-                })
-                .catch(err => {
-                    if (err.name !== 'AuthCancelledError') {
-                        showToast('error', err.message);
-                    }
-                });
-            }
-        });
     }
 
     updateThreadDisplay(500);
